@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FARTU MASTI — админ</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #0b0d11;
+        color: #e8ebf1;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+      }
+      h1 { font-size: 18px; letter-spacing: 0.04em; margin: 0 0 4px; }
+      h2 { font-size: 14px; margin: 22px 0 8px; color: #b9c0cd; text-transform: uppercase; letter-spacing: 0.08em; }
+      .muted { color: #8d95a4; font-size: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      input, button, select {
+        background: #12151a;
+        color: #e8ebf1;
+        border: 1px solid #262b34;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+      button { cursor: pointer; }
+      button.primary { background: #5b8cff; border-color: #5b8cff; color: #06101f; font-weight: 600; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #1c2028; }
+      th { color: #8d95a4; font-weight: 500; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+      .card { background: #12151a; border: 1px solid #23272f; border-radius: 14px; padding: 12px; }
+      .card b { display: block; font-size: 20px; margin-top: 4px; }
+      .err { color: #ff6b81; font-size: 12px; }
+      section { margin-bottom: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>FARTU MASTI · админ</h1>
+    <p class="muted">Доступ только для аккаунтов с правами администратора. Токен сессии хранится в этом браузере.</p>
+
+    <div class="row" style="margin: 12px 0">
+      <input id="token" placeholder="Токен сессии администратора" style="flex: 1; min-width: 260px" />
+      <button class="primary" id="save">Подключиться</button>
+      <button id="clear">Выйти</button>
+      <span class="err" id="err"></span>
+    </div>
+
+    <div id="panel" hidden>
+      <section>
+        <h2>Обзор</h2>
+        <div class="cards" id="overview"></div>
+      </section>
+
+      <section>
+        <h2>Пользователи</h2>
+        <div class="row" style="margin-bottom: 8px">
+          <input id="q" placeholder="Поиск по имени или Telegram ID" />
+          <button id="search">Найти</button>
+        </div>
+        <table id="users"></table>
+      </section>
+
+      <section>
+        <h2>Столы</h2>
+        <table id="rooms"></table>
+      </section>
+
+      <section>
+        <h2>Заявки на вывод</h2>
+        <table id="withdrawals"></table>
+      </section>
+
+      <section>
+        <h2>Последние ошибки</h2>
+        <table id="errors"></table>
+      </section>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let token = localStorage.getItem('fm_admin_token') || '';
+
+      function setError(message) {
+        $('err').textContent = message || '';
+      }
+
+      async function call(path, options = {}) {
+        const response = await fetch(path, {
+          method: options.method || 'GET',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: options.body ? JSON.stringify(options.body) : undefined,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || data.message || `Ошибка ${response.status}`);
+        return data;
+      }
+
+      function table(el, head, rows) {
+        el.innerHTML =
+          `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead>` +
+          `<tbody>${rows
+            .map((cells) => `<tr>${cells.map((c) => `<td>${c ?? ''}</td>`).join('')}</tr>`)
+            .join('')}</tbody>`;
+      }
+
+      function money(kopecks) {
+        return `${(Number(kopecks || 0) / 100).toLocaleString('ru-RU')} ₽`;
+      }
+
+      async function loadOverview() {
+        const data = await call('/api/admin/overview');
+        const stats = data.stats || data;
+        $('overview').innerHTML = [
+          ['Пользователей', stats.users],
+          ['Онлайн', stats.online],
+          ['Столов', stats.rooms],
+          ['Партий', stats.matches],
+          ['Оборот пополнений', money(stats.deposits)],
+          ['Выплаты', money(stats.withdrawals)],
+        ]
+          .map(([label, value]) => `<div class="card"><span class="muted">${label}</span><b>${value ?? 0}</b></div>`)
+          .join('');
+      }
+
+      async function loadUsers(query = '') {
+        const data = await call(`/api/admin/users${query ? `?q=${encodeURIComponent(query)}` : ''}`);
+        table(
+          $('users'),
+          ['Имя', 'Telegram ID', 'Баланс', 'Партии', 'Статус', 'Действия'],
+          (data.users || []).map((user) => [
+            user.username || '—',
+            user.telegramId,
+            money(user.balance),
+            `${user.gamesPlayed ?? 0}`,
+            user.isBanned ? 'заблокирован' : 'активен',
+            `<span class="row">
+               <button onclick="toggleBan(${user.id}, ${user.isBanned ? 'false' : 'true'})">${user.isBanned ? 'Разбанить' : 'Забанить'}</button>
+               <button onclick="creditUser(${user.id})">Начислить</button>
+             </span>`,
+          ]),
+        );
+      }
+
+      async function loadRooms() {
+        const data = await call('/api/admin/rooms');
+        table(
+          $('rooms'),
+          ['Стол', 'Код', 'Игроки', 'Статус', 'Действия'],
+          (data.rooms || []).map((room) => [
+            room.name,
+            room.code || '—',
+            `${room.players}/${room.maxPlayers}`,
+            room.status,
+            `<button onclick="closeRoom('${room.id}')">Закрыть</button>`,
+          ]),
+        );
+      }
+
+      async function loadWithdrawals() {
+        const data = await call('/api/admin/withdrawals');
+        table(
+          $('withdrawals'),
+          ['ID', 'Пользователь', 'Сумма', 'Статус', 'Действия'],
+          (data.withdrawals || []).map((row) => [
+            row.id,
+            row.username || row.userId,
+            money(row.amount),
+            row.status,
+            `<span class="row">
+               <button onclick="decide(${row.id}, 'paid')">Выплачено</button>
+               <button onclick="decide(${row.id}, 'rejected')">Отклонить</button>
+             </span>`,
+          ]),
+        );
+      }
+
+      async function loadErrors() {
+        const data = await call('/api/admin/errors');
+        table(
+          $('errors'),
+          ['Время', 'Уровень', 'Сообщение'],
+          (data.errors || []).map((row) => [
+            new Date(row.createdAt || row.created_at).toLocaleString('ru-RU'),
+            row.level,
+            String(row.message || '').slice(0, 120),
+          ]),
+        );
+      }
+
+      async function refresh() {
+        try {
+          setError('');
+          await Promise.all([loadOverview(), loadUsers($('q').value.trim()), loadRooms(), loadWithdrawals(), loadErrors()]);
+          $('panel').hidden = false;
+        } catch (error) {
+          setError(error.message);
+        }
+      }
+
+      window.toggleBan = async (id, banned) => {
+        await call(`/api/admin/users/${id}/ban`, { method: 'POST', body: { banned } });
+        refresh();
+      };
+
+      window.creditUser = async (id) => {
+        const rubles = Number(prompt('Сумма в рублях (можно отрицательную):', '100'));
+        if (!Number.isFinite(rubles) || rubles === 0) return;
+        const reason = prompt('Комментарий к операции:', 'корректировка администратором') || '';
+        await call(`/api/admin/users/${id}/balance`, {
+          method: 'POST',
+          body: { amount: Math.round(rubles * 100), reason },
+        });
+        refresh();
+      };
+
+      window.closeRoom = async (id) => {
+        await call(`/api/admin/rooms/${id}/close`, { method: 'POST' });
+        refresh();
+      };
+
+      window.decide = async (id, status) => {
+        await call(`/api/admin/withdrawals/${id}`, { method: 'POST', body: { status } });
+        refresh();
+      };
+
+      $('save').onclick = () => {
+        token = $('token').value.trim();
+        localStorage.setItem('fm_admin_token', token);
+        refresh();
+      };
+      $('clear').onclick = () => {
+        token = '';
+        localStorage.removeItem('fm_admin_token');
+        $('panel').hidden = true;
+      };
+      $('search').onclick = () => loadUsers($('q').value.trim()).catch((e) => setError(e.message));
+
+      if (token) {
+        $('token').value = token;
+        refresh();
+      }
+    </script>
+  </body>
+</html>
