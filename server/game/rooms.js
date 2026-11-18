@@ -61,6 +61,7 @@ export function createRoomManager({
     const finishedState = room.game && room.game.finished ? publicState(room.game, userId) : null;
     return {
       id: room.id,
+      code: room.code || null,
       name: room.name,
       status: room.status,
       maxPlayers: room.maxPlayers,
@@ -97,6 +98,7 @@ export function createRoomManager({
       .slice(0, 30)
       .map((room) => ({
         id: room.id,
+        code: room.code || null,
         name: room.name,
         players: room.players.length,
         maxPlayers: room.maxPlayers,
