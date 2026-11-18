@@ -750,7 +750,10 @@ export async function buildServer() {
             rooms.leaveQueue(currentUser.id);
             break;
           case 'room:create':
-            rooms.createRoom(currentUser, { maxPlayers: Number(message.maxPlayers) || 2 });
+            rooms.createRoom(currentUser, {
+              maxPlayers: Number(message.maxPlayers) || 2,
+              mode: message.mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy',
+            });
             break;
           case 'room:join':
             rooms.joinRoom(currentUser, String(message.roomId || ''));
