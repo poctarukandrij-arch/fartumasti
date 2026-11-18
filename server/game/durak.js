@@ -176,7 +176,10 @@ function startBout(state, attackerIndex) {
   touch(state);
 }
 
-export function createGame(playerInfos, rng = Math.random) {
+export const MODES = { PODKIDNOY: 'podkidnoy', PEREVODNOY: 'perevodnoy' };
+export const MODE_TITLES = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
+
+export function createGame(playerInfos, rng = Math.random, { mode = MODES.PODKIDNOY } = {}) {
   if (!Array.isArray(playerInfos) || playerInfos.length < MIN_PLAYERS || playerInfos.length > MAX_PLAYERS) {
     throw new GameError(`За столом должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS} игроков`, 'BAD_PLAYERS');
   }
@@ -202,6 +205,7 @@ export function createGame(playerInfos, rng = Math.random) {
     deck,
     trumpCard,
     trumpSuit: trumpCard.suit,
+    mode: mode === MODES.PEREVODNOY ? MODES.PEREVODNOY : MODES.PODKIDNOY,
     table: [],
     discardCount: 0,
     attackerIndex: 0,
@@ -278,6 +282,7 @@ function doAttack(state, playerIndex, action) {
   removeCard(player, card.id);
   state.table.push({ attack: card, defend: null });
   state.phase = 'defend';
+  state.turnUserId = state.players[state.defenderIndex]?.userId ?? state.turnUserId;
   state.events.push({ type: 'attack', userId: player.userId, card });
   touch(state);
   if (state.players[state.defenderIndex].hand.length === 0 && state.deck.length === 0) {
@@ -305,8 +310,65 @@ function doDefend(state, playerIndex, action) {
   removeCard(player, card.id);
   slot.defend = card;
   state.events.push({ type: 'defend', userId: player.userId, card, target: slot.attack });
-  if (state.table.every((s) => s.defend)) state.phase = 'open';
+  if (state.table.every((s) => s.defend)) {
+    state.phase = 'open';
+    state.turnUserId = state.players[state.attackerIndex]?.userId ?? state.turnUserId;
+  }
   touch(state);
+  return state.events;
+}
+
+function transferRank(state) {
+  if (!state.table.length) return null;
+  if (state.table.some((slot) => slot.defend)) return null;
+  const rank = state.table[0].attack.rank;
+  return state.table.every((slot) => slot.attack.rank === rank) ? rank : null;
+}
+
+/** Можно ли перевести атаку на следующего игрока (только переводной дурак). */
+export function canTransfer(state, playerIndex) {
+  if (!state || state.finished) return false;
+  if (state.mode !== MODES.PEREVODNOY) return false;
+  if (state.phase !== 'defend') return false;
+  if (playerIndex !== state.defenderIndex) return false;
+  if (transferRank(state) == null) return false;
+  const next = nextActiveIndex(state, state.defenderIndex, { skipSelf: true });
+  if (next < 0) return false;
+  const nextPlayer = state.players[next];
+  if (!isActive(nextPlayer)) return false;
+  // у следующего защитника должно хватить карт, чтобы отбить стол после перевода
+  if (nextPlayer.hand.length < state.table.length + 1) return false;
+  return true;
+}
+
+function doTransfer(state, playerIndex, action) {
+  const player = state.players[playerIndex];
+  if (playerIndex !== state.defenderIndex) {
+    throw new GameError('Перевести атаку может только защищающийся');
+  }
+  if (state.mode !== MODES.PEREVODNOY) {
+    throw new GameError('В подкидном дураке перевод атаки запрещён', 'MODE');
+  }
+  if (state.phase !== 'defend') throw new GameError('Сейчас нельзя перевести атаку');
+  const rank = transferRank(state);
+  if (rank == null) throw new GameError('Перевод возможен только картой того же достоинства до отбоя');
+  const card = findCard(player, action.cardId);
+  if (!card) throw new GameError('Этой карты нет в руке');
+  if (card.rank !== rank) throw new GameError('Перевести можно только картой того же достоинства');
+  if (!canTransfer(state, playerIndex)) {
+    throw new GameError('Перевод невозможен: у следующего игрока недостаточно карт');
+  }
+  const next = nextActiveIndex(state, state.defenderIndex, { skipSelf: true });
+  const nextPlayer = state.players[next];
+  removeCard(player, card.id);
+  state.table.push({ attack: card, defend: null });
+  state.defenderIndex = next;
+  state.boutLimit = Math.min(MAX_TABLE, Math.max(state.table.length, nextPlayer.hand.length));
+  state.phase = 'defend';
+  state.turnUserId = nextPlayer.userId;
+  state.events.push({ type: 'transfer', userId: player.userId, card, toUserId: nextPlayer.userId });
+  touch(state);
+  if (nextPlayer.hand.length === 0 && state.deck.length === 0) doTake(state, next);
   return state.events;
 }
 
@@ -378,6 +440,8 @@ export function applyAction(state, userId, action) {
       return doAttack(state, playerIndex, action);
     case 'defend':
       return doDefend(state, playerIndex, action);
+    case 'transfer':
+      return doTransfer(state, playerIndex, action);
     case 'take':
       return doTake(state, playerIndex);
     case 'end':
