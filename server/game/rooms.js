@@ -288,7 +288,15 @@ export function createRoomManager({
   }
 
   function joinRoom(user, roomId) {
-    const room = rooms.get(roomId);
+    let room = rooms.get(roomId);
+    if (!room && roomId) {
+      const code = String(roomId).trim().toUpperCase();
+      room = [...rooms.values()].find(
+        (item) =>
+          String(item.code || '').toUpperCase() === code ||
+          String(item.id).toUpperCase() === code,
+      );
+    }
     if (!room) throw new RoomError('Стол не найден', 'ROOM_NOT_FOUND');
     if (room.players.some((p) => p.userId === user.id)) {
       broadcastRoom(room);
