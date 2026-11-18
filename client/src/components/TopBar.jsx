@@ -1,21 +1,23 @@
+import { Logo } from './Logo.jsx';
 import { rub } from '../utils.js';
 
 export function TopBar({ user, connected }) {
+  const unlimited = Boolean(user?.unlimited);
   return (
-    <div className="topbar" style={{ padding: '10px 16px 0', maxWidth: 620, width: '100%', margin: '0 auto' }}>
-      <div className="brand">
-        FARTU MASTI
-      </div>
+    <header className="topbar">
+      <Logo size="sm" />
       <div className="row" style={{ gap: 8 }}>
-        <span className={`pill ${connected ? 'pill--live' : ''}`} title={connected ? 'Соединение активно' : 'Нет связи'}>
-          <span className="dot" style={{ background: connected ? '#37d39b' : '#ff4d6d' }} />
-          {connected ? 'онлайн' : 'связь'}
+        <span className="conn" title={connected ? 'Соединение активно' : 'Переподключение'}>
+          <i className={`conn__dot ${connected ? '' : 'conn__dot--off'}`} aria-hidden="true" />
+          {connected ? 'в сети' : 'связь'}
         </span>
-        <span className="balance">
-          <span className="balance__icon" />
-          {rub(user.balance)}
+        <span className={`balance-chip ${unlimited ? 'balance-chip--unlimited' : ''}`}>
+          <span className="balance-chip__coin" aria-hidden="true">₽</span>
+          <span className="num">{unlimited ? '∞' : rub(user?.balance)}</span>
         </span>
       </div>
-    </div>
+    </header>
   );
 }
+
+export default TopBar;

@@ -1,46 +1,52 @@
-import { suitSymbol, isRed } from '../utils.js';
+import { suitSymbol, isRed, cardLabel } from '../utils.js';
 
-export function PlayingCard({ card, size = 'md', faceDown = false, deckClass = '', selected, disabled, onClick }) {
-  const sizeClass = size === 'sm' ? 'playing-card--sm' : size === 'xs' ? 'playing-card--xs' : '';
-  const classes = ['playing-card', sizeClass];
-  if (isRed(card)) classes.push('playing-card--red');
+export function PlayingCard({
+  card,
+  size = 'md',
+  faceDown = false,
+  deckClass = '',
+  selected = false,
+  disabled = false,
+  onClick,
+}) {
+  const classes = ['playing-card'];
+  if (size === 'sm') classes.push('playing-card--sm');
+  if (size === 'xs') classes.push('playing-card--xs');
   if (faceDown) {
-    classes.push('playing-card--back', deckClass);
-  } else if (onClick) {
-    classes.push('playing-card--selectable');
+    classes.push('playing-card--back');
+    if (deckClass) classes.push(deckClass);
+  } else if (isRed(card)) {
+    classes.push('playing-card--red');
   }
+  if (onClick && !disabled) classes.push('playing-card--selectable');
   if (selected) classes.push('playing-card--selected');
   if (disabled) classes.push('playing-card--disabled');
-
-  if (faceDown) {
-    return <div className={classes.filter(Boolean).join(' ')} aria-hidden="true" />;
-  }
-
-  if (!card) {
-    return <div className={classes.filter(Boolean).join(' ')} aria-hidden="true" />;
-  }
 
   return (
     <button
       type="button"
-      className={classes.filter(Boolean).join(' ')}
-      onClick={onClick || undefined}
-      disabled={disabled}
-      aria-label={`${card.rank} ${suitSymbol(card.suit)}`}
+      className={classes.join(' ')}
+      onClick={onClick && !disabled ? onClick : undefined}
+      disabled={!onClick || disabled}
+      aria-label={faceDown ? 'Закрытая карта' : cardLabel(card)}
     >
-      <span className="playing-card__rank">{card.rank}</span>
-      <span className="playing-card__center">{suitSymbol(card.suit)}</span>
-      <span className="playing-card__suit">{suitSymbol(card.suit)}</span>
+      {faceDown ? null : (
+        <>
+          <span className="playing-card__rank">{card.rank}</span>
+          <span className="playing-card__center">{suitSymbol(card.suit)}</span>
+          <span className="playing-card__suit">{suitSymbol(card.suit)}</span>
+        </>
+      )}
     </button>
   );
 }
 
 export function CardBack({ deckClass = '', size = 'sm' }) {
-  const sizeClass = size === 'sm' ? 'playing-card--sm' : size === 'xs' ? 'playing-card--xs' : '';
-  return (
-    <div
-      className={['playing-card', 'playing-card--back', sizeClass, deckClass].filter(Boolean).join(' ')}
-      aria-hidden="true"
-    />
-  );
+  const classes = ['playing-card', 'playing-card--back'];
+  if (size === 'sm') classes.push('playing-card--sm');
+  if (size === 'xs') classes.push('playing-card--xs');
+  if (deckClass) classes.push(deckClass);
+  return <span className={classes.join(' ')} aria-hidden="true" />;
 }
+
+export default PlayingCard;
