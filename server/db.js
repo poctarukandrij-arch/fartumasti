@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS users (
   equipped_deck TEXT NOT NULL DEFAULT 'deck_graphite',
   equipped_table TEXT NOT NULL DEFAULT 'table_graphite',
   equipped_emoji TEXT NOT NULL DEFAULT 'emoji_none',
-  equipped_effect TEXT NOT NULL DEFAULT 'effect_none'
+  equipped_effect TEXT NOT NULL DEFAULT 'effect_none',
+  games_played INTEGER NOT NULL DEFAULT 0,
+  wins INTEGER NOT NULL DEFAULT 0,
+  losses INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -43,14 +47,15 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE TABLE IF NOT EXISTS matches (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY,
   room_id TEXT,
+  status TEXT NOT NULL DEFAULT 'playing',
+  players INTEGER NOT NULL DEFAULT 0,
   started_at INTEGER NOT NULL,
   ended_at INTEGER,
-  durak_user_id INTEGER,
-  players_json TEXT NOT NULL,
   rounds INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'playing'
+  loser_id INTEGER,
+  players_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS match_results (
@@ -59,6 +64,7 @@ CREATE TABLE IF NOT EXISTS match_results (
   user_id INTEGER NOT NULL,
   place INTEGER NOT NULL DEFAULT 0,
   is_winner INTEGER NOT NULL DEFAULT 0,
+  cards_left INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 
@@ -107,18 +113,24 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 CREATE TABLE IF NOT EXISTS payments (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
   amount INTEGER NOT NULL,
-  provider TEXT NOT NULL,
   status TEXT NOT NULL,
-  confirmation_url TEXT,
+  provider TEXT,
+  provider_id TEXT,
   meta TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS rooms (
-  room_id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  owner_id INTEGER,
+  max_players INTEGER NOT NULL DEFAULT 2,
+  status TEXT NOT NULL DEFAULT 'waiting',
   state TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 
@@ -159,6 +171,8 @@ CREATE INDEX IF NOT EXISTS idx_results_user ON match_results (user_id, created_a
 CREATE INDEX IF NOT EXISTS idx_inventory_user ON inventory (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_room ON chat_logs (room_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_provider ON payments (provider_id);
+CREATE INDEX IF NOT EXISTS idx_payments_user ON payments (user_id, created_at DESC);
 `;
 
 function schedulePersist() {
