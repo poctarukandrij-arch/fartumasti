@@ -5,19 +5,55 @@ import { GameSocket } from './ws.js';
 import { Voice } from './voice.js';
 import { Toasts } from './components/Toasts.jsx';
 import { TopBar } from './components/TopBar.jsx';
+import { Logo } from './components/Logo.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Home from './screens/Home.jsx';
 import Shop from './screens/Shop.jsx';
 import Stats from './screens/Stats.jsx';
 import Profile from './screens/Profile.jsx';
+import Withdraw from './screens/Withdraw.jsx';
 import TableScreen from './screens/Table.jsx';
 
 const TABS = [
-  { id: 'home', label: 'Главная', icon: '⌂' },
-  { id: 'shop', label: 'Магазин', icon: '◈' },
-  { id: 'stats', label: 'Статистика', icon: '▤' },
-  { id: 'profile', label: 'Профиль', icon: '◉' },
+  { id: 'home', label: 'Главная', icon: 'home' },
+  { id: 'shop', label: 'Магазин', icon: 'shop' },
+  { id: 'stats', label: 'Статистика', icon: 'stats' },
+  { id: 'profile', label: 'Профиль', icon: 'profile' },
 ];
+
+const NAV_PATHS = {
+  home: <path d="M3 10.5 12 3.5l9 7V21h-6v-6H9v6H3z" />,
+  shop: (
+    <>
+      <path d="M4.5 8h15l-1.4 12H5.9z" />
+      <path d="M8.5 8a3.5 3.5 0 0 1 7 0" />
+    </>
+  ),
+  stats: <path d="M4 20v-9M10 20V4M16 20v-6M22 20H2" />,
+  profile: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 21c0-3.8 3.4-6 7.5-6s7.5 2.2 7.5 6" />
+    </>
+  ),
+};
+
+function NavIcon({ name }) {
+  return (
+    <svg
+      className="nav__icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {NAV_PATHS[name]}
+    </svg>
+  );
+}
 
 export default function App() {
   const [phase, setPhase] = useState('boot');
@@ -30,6 +66,8 @@ export default function App() {
   const [lobby, setLobby] = useState(null);
   const [room, setRoom] = useState(null);
   const [tab, setTab] = useState('home');
+  const [overlay, setOverlay] = useState(null);
+  const [inQueue, setInQueue] = useState(false);
   const [connected, setConnected] = useState(false);
   const [toasts, setToasts] = useState([]);
   const socketRef = useRef(null);
@@ -121,9 +159,16 @@ export default function App() {
         );
         setLobby(msg.lobby);
         setRoom(msg.room);
+        if (msg.room) setInQueue(false);
       }),
       socket.on('lobby', (msg) => setLobby(msg.lobby)),
-      socket.on('room', (msg) => setRoom(msg.room)),
+      socket.on('room', (msg) => {
+        setRoom(msg.room);
+        if (msg.room) {
+          setInQueue(false);
+          setOverlay(null);
+        }
+      }),
       socket.on('room:closed', (msg) => {
         setRoom(null);
         setTab('home');
@@ -144,6 +189,9 @@ export default function App() {
   }, [phase, toast]);
 
   const send = useCallback((payload) => {
+    if (payload?.type === 'queue:join') setInQueue(true);
+    if (payload?.type === 'queue:leave') setInQueue(false);
+    if (payload?.type === 'room:leave') setInQueue(false);
     socketRef.current?.send(payload);
   }, []);
 
@@ -190,6 +238,7 @@ export default function App() {
     voiceRef.current?.reset();
     setMe(null);
     setRoom(null);
+    setOverlay(null);
     setPhase('auth');
     setTab('home');
   }, []);
@@ -198,13 +247,14 @@ export default function App() {
     send({ type: 'room:leave' });
     voiceRef.current?.reset();
     setRoom(null);
+    setOverlay(null);
     setTab('home');
   }, [send]);
 
   if (phase === 'boot') {
     return (
       <div className="splash">
-        <div className="splash__logo">FARTU MASTI</div>
+        <Logo size="lg" tagline />
         <div className="spinner" />
         <p className="muted small">Загрузка стола…</p>
       </div>
@@ -214,7 +264,7 @@ export default function App() {
   if (phase === 'auth' || !me) {
     return (
       <div className="onboarding">
-        <div className="splash__logo">FARTU MASTI</div>
+        <Logo size="lg" tagline />
         <p className="muted small" style={{ textAlign: 'center' }}>
           Вход выполняется автоматически через Telegram. Откройте приложение из бота FARTU MASTI.
         </p>
@@ -278,15 +328,26 @@ export default function App() {
     return (
       <>
         <Onboarding
-          config={me.config}
           onDone={(data) => {
             setMe(data);
             haptic('success');
           }}
-          toast={toast}
         />
         <Toasts items={toasts} />
       </>
+    );
+  }
+
+  if (overlay === 'withdraw') {
+    return (
+      <div className="app">
+        <div className="app__bg" aria-hidden="true" />
+        <TopBar user={me.user} connected={connected} />
+        <main className="app__main">
+          <Withdraw me={me.user} onBack={() => setOverlay(null)} />
+        </main>
+        <Toasts items={toasts} />
+      </div>
     );
   }
 
@@ -294,35 +355,43 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="app__bg" aria-hidden="true" />
       {!inRoom ? <TopBar user={me.user} connected={connected} /> : null}
-      {inRoom ? (
-        <TableScreen
-          room={room}
-          me={me}
-          send={send}
-          voice={voiceRef.current}
-          toast={toast}
-          onLeave={leaveRoom}
-          onRefreshMe={refreshMe}
-        />
-      ) : tab === 'home' ? (
-        <Home
-          me={me}
-          lobby={lobby}
-          connected={connected}
-          send={send}
-          toast={toast}
-        />
-      ) : tab === 'shop' ? (
-        <Shop me={me} refreshMe={refreshMe} toast={toast} />
-      ) : tab === 'stats' ? (
-        <Stats me={me} toast={toast} />
-      ) : (
-        <Profile me={me} refreshMe={refreshMe} onLogout={logout} toast={toast} />
-      )}
+
+      <main className={`app__main ${inRoom ? 'app__main--room' : ''}`}>
+        {inRoom ? (
+          <TableScreen
+            room={room}
+            me={me}
+            send={send}
+            voice={voiceRef.current}
+            toast={toast}
+            onLeave={leaveRoom}
+            onRefreshMe={refreshMe}
+          />
+        ) : (
+          <div className="screen" key={tab}>
+            {tab === 'home' ? (
+              <Home me={me.user} lobby={lobby} send={send} toast={toast} inQueue={inQueue} />
+            ) : null}
+            {tab === 'shop' ? <Shop me={me.user} toast={toast} refreshMe={refreshMe} /> : null}
+            {tab === 'stats' ? <Stats me={{ ...me.user, stats: me.stats }} toast={toast} /> : null}
+            {tab === 'profile' ? (
+              <Profile
+                me={me.user}
+                stats={me.stats}
+                onLogout={logout}
+                onWithdraw={() => setOverlay('withdraw')}
+                refreshMe={refreshMe}
+                toast={toast}
+              />
+            ) : null}
+          </div>
+        )}
+      </main>
 
       {!inRoom ? (
-        <nav className="nav">
+        <nav className="nav" aria-label="Основная навигация">
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -333,14 +402,13 @@ export default function App() {
                 setTab(item.id);
               }}
             >
-              <span className="ico" aria-hidden="true">
-                {item.icon}
-              </span>
-              {item.label}
+              <NavIcon name={item.icon} />
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
       ) : null}
+
       <Toasts items={toasts} />
     </div>
   );
