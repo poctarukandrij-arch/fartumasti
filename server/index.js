@@ -193,10 +193,10 @@ export async function buildServer() {
       [
         "default-src 'self'",
         "script-src 'self' https://telegram.org",
-        "style-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: blob:",
         "media-src 'self' blob:",
-        "font-src 'self' data:",
+        "font-src 'self' data: https://fonts.gstatic.com",
         "connect-src 'self' ws: wss:",
         "frame-ancestors https://web.telegram.org https://*.telegram.org",
       ].join('; '),
