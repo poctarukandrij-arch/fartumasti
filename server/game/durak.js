@@ -500,10 +500,67 @@ export function autoAction(state) {
   return { userId: attacker.userId, action: { type: 'attack', cardId: card.id } };
 }
 
+/** Допустимые ходы для конкретного игрока — клиент только подсвечивает, решает сервер. */
+export function legalMoves(state, userId) {
+  const result = {
+    attack: [],
+    defend: [],
+    transfer: [],
+    canTake: false,
+    canEnd: false,
+    mustAct: false,
+    isAttacker: false,
+    isDefender: false,
+  };
+  if (!state || state.finished) return result;
+  const index = state.players.findIndex((p) => p.userId === userId);
+  if (index === -1) return result;
+  const player = state.players[index];
+  if (!isActive(player)) return result;
+  result.isAttacker = index === state.attackerIndex;
+  result.isDefender = index === state.defenderIndex;
+
+  if (state.phase === 'defend' && result.isDefender) {
+    for (const slot of state.table) {
+      if (slot.defend) continue;
+      for (const card of player.hand) {
+        if (beats(card, slot.attack, state.trumpSuit)) {
+          result.defend.push({ cardId: card.id, targetCardId: slot.attack.id });
+        }
+      }
+    }
+    result.canTake = true;
+    if (canTransfer(state, index)) {
+      const rank = transferRank(state);
+      result.transfer = player.hand.filter((card) => card.rank === rank).map((card) => card.id);
+    }
+  }
+
+  if (state.phase === 'open' && !result.isDefender) {
+    const mayJoin = state.table.length > 0 || result.isAttacker;
+    if (mayJoin && state.table.length < state.boutLimit) {
+      const ranks = state.table.length ? new Set(state.table.map((slot) => slot.attack.rank)) : null;
+      result.attack = player.hand
+        .filter((card) => !ranks || ranks.has(card.rank))
+        .map((card) => card.id);
+    }
+    if (result.isAttacker && state.table.length > 0) result.canEnd = true;
+  }
+
+  result.mustAct =
+    result.attack.length > 0 ||
+    result.defend.length > 0 ||
+    result.transfer.length > 0 ||
+    result.canTake ||
+    result.canEnd;
+  return result;
+}
+
 /** Состояние, безопасное для отправки конкретному игроку. */
 export function publicState(state, viewerUserId) {
   const isViewer = (p) => p.userId === viewerUserId;
   const viewer = state.players.find(isViewer);
+  const legal = legalMoves(state, viewerUserId);
   return {
     players: state.players.map((p) => ({
       userId: p.userId,
@@ -531,14 +588,8 @@ export function publicState(state, viewerUserId) {
     loserId: state.loserId,
     winners: state.winners,
     version: state.version,
-    canAct: Boolean(
-      viewer &&
-        isActive(viewer) &&
-        !state.finished &&
-        (state.phase === 'defend'
-          ? viewer.userId === state.players[state.defenderIndex]?.userId
-          : state.players[state.attackerIndex]?.userId === viewer.userId ||
-            state.players[state.defenderIndex]?.userId !== viewer.userId),
-    ),
+    mode: state.mode || MODES.PODKIDNOY,
+    legal,
+    canAct: legal.mustAct,
   };
 }
