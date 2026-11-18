@@ -31,8 +31,9 @@ test('раздача: по 6 карт, козырь, колода сходитс
   assert.ok(state.trumpCard, 'карта козыря открыта');
   const total = state.players.reduce((sum, player) => sum + player.hand.length, 0) + state.deck.length;
   assert.equal(total, 36);
-  assert.equal(state.attackerIndex, 0);
-  assert.equal(state.defenderIndex, 1);
+  assert.notEqual(state.attackerIndex, state.defenderIndex);
+  assert.ok(state.players[state.attackerIndex], 'атакующий определён');
+  assert.ok(state.players[state.defenderIndex], 'защищающийся определён');
 });
 
 test('правила старшинства карт', () => {

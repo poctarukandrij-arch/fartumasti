@@ -115,12 +115,16 @@ function markOut(state) {
   }
 }
 
-function finishGame(state) {
+function finishGame(state, { forcedLoserId = null } = {}) {
   state.finished = true;
   state.phase = 'finished';
   state.turnUserId = null;
   const withCards = state.players.filter((p) => !p.left && p.hand.length > 0);
-  if (withCards.length === 0) {
+  if (forcedLoserId != null) {
+    // игрок вышел из партии — проигравшим считается он, а не оставшийся за столом
+    state.loserId = forcedLoserId;
+    state.winners = state.players.filter((p) => !p.left).map((p) => p.userId);
+  } else if (withCards.length === 0) {
     state.loserId = null;
     state.winners = state.players.filter((p) => !p.left).map((p) => p.userId);
   } else {
@@ -395,7 +399,7 @@ export function handlePlayerLeft(state, userId) {
   player.hand = [];
   state.events.push({ type: 'left', userId });
   if (state.players.filter(isActive).length <= 1) {
-    finishGame(state);
+    finishGame(state, { forcedLoserId: userId });
     return state.events;
   }
   if (idx === state.defenderIndex || idx === state.attackerIndex) {
