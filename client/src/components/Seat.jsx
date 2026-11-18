@@ -1,4 +1,5 @@
 import { CardBack } from './PlayingCard.jsx';
+import { emojiOf, effectOf } from '../catalog.js';
 
 export function Seat({ player, gamePlayer, deckClass, muted, onToggleMute, isSelf }) {
   const cards = gamePlayer?.cards ?? 0;
@@ -6,24 +7,20 @@ export function Seat({ player, gamePlayer, deckClass, muted, onToggleMute, isSel
   const classes = ['seat'];
   if (turn) classes.push('seat--turn');
   if (!player.connected) classes.push('seat--offline');
-  const effect = player.equipped?.effect;
-  const auraClass =
-    effect === 'effect_aura_violet'
-      ? 'effect-aura effect-aura--violet'
-      : effect === 'effect_aura_ember'
-        ? 'effect-aura effect-aura--ember'
-        : effect === 'effect_aura_frost'
-          ? 'effect-aura effect-aura--frost'
-          : effect && effect !== 'effect_none'
-            ? 'effect-aura'
-            : '';
+  const aura = effectOf(player.equipped?.effect);
+  const emoji = emojiOf(player.equipped?.emoji);
 
   return (
     <div className={classes.join(' ')}>
-      {auraClass ? <div className={auraClass} /> : null}
-      {player.mic ? <span className="seat__mic" title="Микрофон включён">🎙</span> : null}
+      {aura ? <div className={`effect-aura ${aura}`} /> : null}
+      {player.mic ? (
+        <span className="seat__mic" title="Микрофон включён">
+          🎙
+        </span>
+      ) : null}
       <div className="seat__name">
         <span>{player.username || 'Игрок'}</span>
+        {emoji ? <span className="seat__emoji">{emoji}</span> : null}
         {player.isOwner ? <span className="seat__badge">хост</span> : null}
       </div>
       <div className="seat__meta">
@@ -43,8 +40,9 @@ export function Seat({ player, gamePlayer, deckClass, muted, onToggleMute, isSel
           type="button"
           className="seat__mute-btn"
           onClick={() => onToggleMute?.(player.userId)}
+          aria-label={muted ? 'Включить звук игрока' : 'Заглушить игрока'}
         >
-          {muted ? 'вкл' : 'mute'}
+          {muted ? 'вкл' : 'выкл'}
         </button>
       ) : null}
     </div>
