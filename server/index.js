@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { initDb, db, logError, persistNow } from './db.js';
+import { initDb, db, logError, persistNow, getSetting, setSetting } from './db.js';
 import {
   verifyInitData,
   validateUsername,
@@ -22,7 +22,7 @@ import {
   devLoginEnabled,
 } from './auth.js';
 import * as shop from './shop.js';
-import { credit, debit, listTransactions, listPurchases, WalletError } from './wallet.js';
+import { credit, debit, listTransactions, listPurchases, WalletError, isUnlimited, applyUnlimitedGrant } from './wallet.js';
 import {
   createDeposit,
   confirmProviderPayment,
@@ -86,7 +86,38 @@ function publicConfig() {
     chatLimit: 30,
     turnTimeoutMs: TURN_TIMEOUT_MS,
     devLogin: devLoginEnabled(),
+    withdrawEnabled: false,
+    shopLockedTypes: shop.LOCKED_TYPES,
+    modes: { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' },
   };
+}
+
+/**
+ * Закрепляет безлимитный виртуальный баланс за аккаунтом владельца по внутреннему id.
+ * Имя используется только один раз для первичной привязки, дальше — сохранённый id.
+ */
+function bootstrapUnlimited() {
+  const explicit = Number(process.env.ARCHI_USER_ID || 0) || null;
+  if (explicit) {
+    applyUnlimitedGrant({ userId: explicit });
+    setSetting('archi_user_id', explicit);
+    return;
+  }
+  if (process.env.ARCHI_TELEGRAM_ID) {
+    const bound = applyUnlimitedGrant({ telegramId: process.env.ARCHI_TELEGRAM_ID });
+    if (bound) setSetting('archi_user_id', bound);
+    return;
+  }
+  const saved = getSetting('archi_user_id');
+  if (saved) {
+    applyUnlimitedGrant({ userId: Number(saved) });
+    return;
+  }
+  const rows = db.all("SELECT id FROM users WHERE username = 'Archi' COLLATE NOCASE");
+  if (rows.length === 1) {
+    applyUnlimitedGrant({ userId: rows[0].id });
+    setSetting('archi_user_id', rows[0].id);
+  }
 }
 
 function userStats(user) {
@@ -137,7 +168,7 @@ function userHistory(userId, limit = 50) {
 
 function mePayload(user) {
   return {
-    user: publicUser(user),
+    user: { ...publicUser(user), unlimited: isUnlimited(user.id) },
     stats: userStats(user),
     inventory: shop.inventoryWithItems(user.id),
     equipped: shop.equippedOf(user),
@@ -357,6 +388,9 @@ export async function buildServer() {
       owned,
       balance: req.user.balance,
       equipped: shop.equippedOf(req.user),
+      lockedTypes: shop.LOCKED_TYPES,
+      caseHistory: shop.caseHistory(req.user.id, 12),
+      unlimited: isUnlimited(req.user.id),
     });
   });
 
@@ -372,12 +406,14 @@ export async function buildServer() {
 
   app.post('/api/shop/case', requireAuth, (req, res) => {
     try {
-      const { caseId } = req.body || {};
-      const result = shop.openCase(req.user.id, String(caseId || ''));
+      const { caseId, requestId } = req.body || {};
+      const result = shop.openCase(req.user.id, String(caseId || ''), Math.random, { requestId });
       res.json({
         ...result,
         owned: [...shop.ownedItemIds(req.user.id)],
         inventory: shop.inventoryWithItems(req.user.id),
+        caseHistory: shop.caseHistory(req.user.id, 12),
+        balance: result.balance,
       });
     } catch (error) {
       mapError(res, error);
@@ -443,17 +479,13 @@ export async function buildServer() {
   });
 
   app.post('/api/wallet/withdraw', requireAuth, (req, res) => {
-    try {
-      const amount = Number(req.body?.amount);
-      if (!Number.isInteger(amount)) return fail(res, 400, 'BAD_AMOUNT', 'Сумма должна быть целым числом копеек');
-      const result = requestWithdrawal(req.user.id, amount, {
-        method: String(req.body?.method || 'card').slice(0, 24),
-        destination: req.body?.destination,
-      });
-      res.json(result);
-    } catch (error) {
-      mapError(res, error);
-    }
+    // Вывод средств не подключён: виртуальный баланс не является деньгами.
+    return fail(
+      res,
+      503,
+      'WITHDRAW_SOON',
+      'Вывод средств появится позже. Виртуальные рубли не имеют денежной стоимости.',
+    );
   });
 
   app.post('/api/payments/sync', requireAuth, async (req, res) => {
@@ -821,6 +853,8 @@ export async function buildServer() {
 }
 
 export async function main() {
+  await initDb();
+  bootstrapUnlimited();
   const { server } = await buildServer();
   server.listen(PORT, HOST, () => {
     console.log(`[fartu] сервер запущен на http://${HOST}:${PORT}`);
