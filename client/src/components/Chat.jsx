@@ -1,74 +1,81 @@
 import { useEffect, useRef, useState } from 'react';
 
-const EMOJIS = ['😂', '😎', '🔥', '👏', '🤝', '😭', '😡', '🤔', '💀', '🍀', '⚡', '🃏'];
+const QUICK_EMOJI = ['🔥', '😂', '😎', '👍', '💀', '⚡', '🎯', '🃏'];
 
-export function Chat({ messages, onSend, onEmoji, limit = 30, disabled }) {
+export function Chat({ chat = [], me, send }) {
   const [text, setText] = useState('');
-  const logRef = useRef(null);
+  const listRef = useRef(null);
 
   useEffect(() => {
-    const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+    const node = listRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [chat.length]);
 
-  const submit = (event) => {
+  function submit(event) {
     event.preventDefault();
-    const value = text.trim();
-    if (!value || disabled) return;
-    onSend(value.slice(0, limit));
+    const value = text.trim().slice(0, 30);
+    if (!value) return;
+    send({ type: 'chat', text: value });
     setText('');
-  };
+  }
 
   return (
     <div className="chat">
-      <div className="chat__log" ref={logRef}>
-        {messages.length === 0 ? (
-          <div className="chat__sys">Чат пуст. Сообщение до 30 символов.</div>
+      <div className="chat__list" ref={listRef}>
+        {chat.length === 0 ? (
+          <div className="chat__empty">Чат стола. Сообщения до 30 символов.</div>
         ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={msg.system ? 'chat__sys' : 'chat__msg'}>
-              {msg.system ? (
-                msg.text
-              ) : (
-                <>
-                  <span className="chat__author">{msg.username}: </span>
-                  <span>{msg.text}</span>
-                </>
-              )}
-            </div>
-          ))
+          chat.map((message) => {
+            const mine = message.userId === me?.id;
+            if (message.kind === 'emoji') {
+              return (
+                <div key={message.id} className={`chat__msg chat__msg--emoji ${mine ? 'chat__msg--mine' : ''}`}>
+                  <span className="chat__author">{mine ? 'Вы' : message.username}</span>
+                  <span className="chat__emoji">{message.text}</span>
+                </div>
+              );
+            }
+            return (
+              <div key={message.id} className={`chat__msg ${mine ? 'chat__msg--mine' : ''}`}>
+                <span className="chat__author">{mine ? 'Вы' : message.username}</span>
+                <span className="chat__text">{message.text}</span>
+              </div>
+            );
+          })
         )}
       </div>
-      <div className="emoji-bar">
-        {EMOJIS.map((emoji) => (
+
+      <div className="chat__emoji-bar">
+        {QUICK_EMOJI.map((symbol) => (
           <button
-            key={emoji}
+            key={symbol}
             type="button"
-            className="emoji-btn"
-            onClick={() => onEmoji?.(emoji)}
-            aria-label={`Отправить ${emoji}`}
+            className="chat__emoji-btn"
+            onClick={() => send({ type: 'chat:emoji', symbol })}
+            aria-label={`Отправить ${symbol}`}
           >
-            {emoji}
+            {symbol}
           </button>
         ))}
       </div>
+
       <form className="chat__form" onSubmit={submit}>
         <input
-          className="chat__input"
+          className="input chat__input"
           value={text}
-          maxLength={limit}
-          onChange={(event) => setText(event.target.value)}
+          maxLength={30}
+          onChange={(event) => setText(event.target.value.slice(0, 30))}
           placeholder="Сообщение"
           aria-label="Сообщение в чат"
-          disabled={disabled}
+          autoComplete="off"
         />
-        <span className="chat__counter">
-          {text.length}/{limit}
-        </span>
-        <button className="btn btn--sm btn--primary" type="submit" disabled={!text.trim() || disabled}>
+        <span className="chat__count">{text.length}/30</span>
+        <button type="submit" className="btn btn--primary btn--sm" disabled={!text.trim()}>
           Отправить
         </button>
       </form>
     </div>
   );
 }
+
+export default Chat;
