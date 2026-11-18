@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, getToken, setToken } from './api.js';
-import { initTelegram, getInitData, haptic } from './telegram.js';
+import { initTelegram, waitForInitData, tg, openLink, haptic } from './telegram.js';
 import { GameSocket } from './ws.js';
 import { Voice } from './voice.js';
 import { Toasts } from './components/Toasts.jsx';
@@ -22,6 +22,7 @@ const TABS = [
 export default function App() {
   const [phase, setPhase] = useState('boot');
   const [authError, setAuthError] = useState('');
+  const [authAttempt, setAuthAttempt] = useState(0);
   const [devLogin, setDevLogin] = useState(false);
   const [devId, setDevId] = useState('1001');
   const [devName, setDevName] = useState('Тест');
@@ -32,6 +33,7 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [toasts, setToasts] = useState([]);
   const socketRef = useRef(null);
+  const autoRetryRef = useRef(0);
   const voiceRef = useRef(null);
 
   const toast = useCallback((message, kind = 'info') => {
@@ -65,7 +67,8 @@ export default function App() {
         }
       }
 
-      const initData = getInitData();
+      const initData = await waitForInitData({ timeoutMs: 6000 });
+      if (!alive) return;
       if (initData) {
         try {
           const data = await api('/auth/telegram', {
@@ -88,13 +91,19 @@ export default function App() {
           if (!alive) return;
           setAuthError(error.message || 'Не удалось войти через Telegram');
         }
+      } else if (autoRetryRef.current < 2) {
+        // На iOS SDK инициализируется с задержкой — повторяем попытку входа.
+        autoRetryRef.current += 1;
+        setTimeout(() => {
+          if (alive) setAuthAttempt((count) => count + 1);
+        }, 1500);
       }
       if (alive) setPhase('auth');
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [authAttempt]);
 
   useEffect(() => {
     if (phase !== 'ready') return;
@@ -210,6 +219,23 @@ export default function App() {
           Вход выполняется автоматически через Telegram. Откройте приложение из бота FARTU MASTI.
         </p>
         {authError ? <p className="hint hint--error">{authError}</p> : null}
+        <button
+          className="btn btn--primary btn--wide"
+          type="button"
+          onClick={() => {
+            autoRetryRef.current = 2;
+            setAuthError('');
+            setPhase('boot');
+            setAuthAttempt((count) => count + 1);
+          }}
+        >
+          Повторить вход
+        </button>
+        {tg() ? null : (
+          <button className="btn btn--wide" type="button" onClick={() => openLink('https://t.me/Fartumastiibot')}>
+            Открыть в Telegram
+          </button>
+        )}
         {devLogin ? (
           <div className="panel col">
             <div className="field">
