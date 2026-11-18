@@ -20,7 +20,7 @@ export function Chat({ chat = [], me, send }) {
   }
 
   return (
-    <div className="chat">
+    <>
       <div className="chat__list" ref={listRef}>
         {chat.length === 0 ? (
           <div className="chat__empty">Чат стола. Сообщения до 30 символов.</div>
@@ -29,7 +29,7 @@ export function Chat({ chat = [], me, send }) {
             const mine = message.userId === me?.id;
             if (message.kind === 'emoji') {
               return (
-                <div key={message.id} className={`chat__msg chat__msg--emoji ${mine ? 'chat__msg--mine' : ''}`}>
+                <div key={message.id} className={`chat__msg ${mine ? 'chat__msg--mine' : ''}`}>
                   <span className="chat__author">{mine ? 'Вы' : message.username}</span>
                   <span className="chat__emoji">{message.text}</span>
                 </div>
@@ -45,12 +45,12 @@ export function Chat({ chat = [], me, send }) {
         )}
       </div>
 
-      <div className="chat__emoji-bar">
+      <div className="emoji-bar">
         {QUICK_EMOJI.map((symbol) => (
           <button
             key={symbol}
             type="button"
-            className="chat__emoji-btn"
+            className="emoji-btn"
             onClick={() => send({ type: 'chat:emoji', symbol })}
             aria-label={`Отправить ${symbol}`}
           >
@@ -61,7 +61,7 @@ export function Chat({ chat = [], me, send }) {
 
       <form className="chat__form" onSubmit={submit}>
         <input
-          className="input chat__input"
+          className="chat__input"
           value={text}
           maxLength={30}
           onChange={(event) => setText(event.target.value.slice(0, 30))}
@@ -69,12 +69,12 @@ export function Chat({ chat = [], me, send }) {
           aria-label="Сообщение в чат"
           autoComplete="off"
         />
-        <span className="chat__count">{text.length}/30</span>
-        <button type="submit" className="btn btn--primary btn--sm" disabled={!text.trim()}>
-          Отправить
+        <span className="chat__counter">{text.length}/30</span>
+        <button type="submit" className="chat__send" disabled={!text.trim()}>
+          →
         </button>
       </form>
-    </div>
+    </>
   );
 }
 

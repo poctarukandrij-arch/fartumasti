@@ -1,385 +1,458 @@
-import { useEffect, useState } from 'react';
-import { PlayingCard, CardBack } from '../components/PlayingCard.jsx';
-import { Seat } from '../components/Seat.jsx';
-import { Chat } from '../components/Chat.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import PlayingCard, { CardBack } from '../components/PlayingCard.jsx';
+import Seat from '../components/Seat.jsx';
+import Chat from '../components/Chat.jsx';
 import { deckClassOf, tableClassOf } from '../catalog.js';
-import { suitSymbol, rub } from '../utils.js';
-import { haptic } from '../telegram.js';
+import { suitSymbol } from '../utils.js';
 
-export default function Table({ room, me, send, voice, toast, onLeave }) {
-  const myId = me.user.id;
+const SUIT_NAME = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
+
+export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe }) {
+  const user = me?.user || me || {};
+  const myId = user.id;
   const game = room?.game;
-  const finished = room?.finished;
-  const [chatOpen, setChatOpen] = useState(false);
-  const [voiceState, setVoiceState] = useState({ micOn: false, muted: [] });
-  const [tick, setTick] = useState(() => Date.now());
+  const [selected, setSelected] = useState(null);
+  const [showChat, setShowChat] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const [muted, setMuted] = useState(() => new Set());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const id = setInterval(() => setTick(Date.now()), 500);
-    return () => clearInterval(id);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    if (!voice) return undefined;
-    voice.onChange = (next) => setVoiceState(next);
-    return () => {
-      voice.onChange = () => {};
-    };
-  }, [voice]);
+    setSelected(null);
+  }, [game?.version, game?.round]);
 
-  if (!room) {
-    return (
-      <div className="screen">
-        <div className="empty">
-          <span className="spinner" />
-        </div>
-      </div>
-    );
+  const mePlayer = room?.players?.find((player) => player.userId === myId);
+  const deckClass = deckClassOf(mePlayer?.equipped?.deck);
+  const feltClass = tableClassOf(mePlayer?.equipped?.table);
+
+  const legal = game?.legal || {};
+  const canAct = Boolean(game?.canAct);
+  const attackIds = useMemo(() => new Set(legal.attack || []), [legal.attack]);
+  const transferIds = useMemo(() => new Set(legal.transfer || []), [legal.transfer]);
+  const defendOptions = useMemo(
+    () => (legal.defend || []).filter((option) => option.cardId === selected),
+    [legal.defend, selected],
+  );
+
+  const hand = game?.hand || [];
+  const table = game?.table || [];
+  const players = game?.players || [];
+  const isDefender = Boolean(legal.isDefender);
+  const isAttacker = Boolean(legal.isAttacker);
+
+  const deadline = room?.turnStartedAt ? room.turnStartedAt + (room.turnTimeoutMs || 0) : 0;
+  const secondsLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+  const turnPlayer = players.find((player) => player.userId === game?.turnUserId);
+
+  const peers = (room?.players || []).filter((player) => player.userId !== myId).map((player) => player.userId);
+
+  function copyCode() {
+    const code = room?.code || room?.id;
+    if (!code) return;
+    try {
+      navigator.clipboard?.writeText(code);
+      toast('Код комнаты скопирован', 'success');
+    } catch {
+      toast(`Код комнаты: ${code}`);
+    }
   }
 
-  const myPlayer = room.players.find((player) => player.userId === myId);
-  const others = room.players.filter((player) => player.userId !== myId);
-  const isOwner = room.ownerId === myId;
-  const equipped = myPlayer?.equipped || {};
-  const deckClass = deckClassOf(equipped.deck);
-  const feltClass = tableClassOf(equipped.table);
+  function playAttack() {
+    if (!selected) {
+      toast('Выберите карту', 'error');
+      return;
+    }
+    send({ type: 'attack', cardId: selected });
+    setSelected(null);
+  }
 
-  const toggleMic = async () => {
+  function playTransfer() {
+    if (!selected) return;
+    send({ type: 'transfer', cardId: selected });
+    setSelected(null);
+  }
+
+  function playDefend(targetCardId) {
+    if (!selected) return;
+    const target = targetCardId || (defendOptions.length === 1 ? defendOptions[0].targetCardId : null);
+    if (!target) {
+      toast('Выберите карту на столе', 'error');
+      return;
+    }
+    send({ type: 'defend', cardId: selected, targetCardId: target });
+    setSelected(null);
+  }
+
+  function onSlotClick(slot) {
+    if (!isDefender || !selected) return;
+    const allowed = (legal.defend || []).some(
+      (option) => option.cardId === selected && option.targetCardId === slot.attack.id,
+    );
+    if (!allowed) {
+      toast('Этой картой нельзя отбить', 'error');
+      return;
+    }
+    playDefend(slot.attack.id);
+  }
+
+  async function toggleMic() {
     if (!voice) {
       toast('Голосовой чат недоступен', 'error');
       return;
     }
     try {
-      if (voiceState.micOn) {
+      if (micOn) {
         voice.disableMic();
+        setMicOn(false);
+        send({ type: 'voice:mic', mic: false });
       } else {
-        await voice.enableMic(others.map((player) => player.userId));
-        toast('Микрофон включён', 'success');
+        await voice.enableMic(peers);
+        setMicOn(true);
+        send({ type: 'voice:mic', mic: true });
       }
-    } catch (error) {
-      toast(error.message || 'Не удалось включить микрофон', 'error');
-    }
-  };
-
-  const toggleMutePlayer = (userId) => {
-    if (!voice) return;
-    voice.togglePlayerMuted(userId);
-  };
-
-  const secondsLeft =
-    game && room.turnStartedAt && room.turnTimeoutMs
-      ? Math.max(0, Math.ceil((room.turnStartedAt + room.turnTimeoutMs - tick) / 1000))
-      : null;
-
-  const playCard = (card) => {
-    if (!game) return;
-    if (!game.canAct) {
-      toast('Сейчас не ваш ход', 'error');
-      return;
-    }
-    haptic('light');
-    if (game.defenderId === myId) {
-      const slot = (game.table || []).find((pair) => !pair.defend);
-      if (!slot) {
-        toast('Сейчас нечего отбивать', 'error');
-        return;
-      }
-      send({
-        type: 'game:action',
-        action: { type: 'defend', cardId: card.id, targetCardId: slot.attack.id },
-      });
-    } else {
-      send({ type: 'game:action', action: { type: 'attack', cardId: card.id } });
-    }
-  };
-
-  const act = (action) => {
-    haptic('light');
-    send({ type: 'game:action', action });
-  };
-
-  const waiting = !game && !finished;
-  const iAmDefender = Boolean(game && game.defenderId === myId);
-  const myHand = game?.hand || [];
-  const table = game?.table || [];
-  const myCardsLeft = game?.players?.find((player) => player.userId === myId)?.cards ?? 0;
-  const readyCount = room.players.filter((player) => player.ready).length;
-  const allReady = room.players.length >= 2 && readyCount === room.players.length;
-
-  const copyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(room.code || room.id);
-      toast('Код комнаты скопирован', 'success');
     } catch {
-      toast(`Код комнаты: ${room.code || room.id}`);
+      toast('Не удалось включить микрофон', 'error');
     }
-  };
+  }
+
+  function toggleMute(playerId) {
+    if (!voice) return;
+    voice.togglePlayerMuted(playerId);
+    setMuted(new Set(voice.muted || []));
+  }
+
+  function muteAll() {
+    if (!voice) return;
+    if (muted.size >= peers.length && peers.length > 0) voice.unmuteAll();
+    else voice.muteAll();
+    setMuted(new Set(voice.muted || []));
+  }
+
+  function cardPlayable(cardId) {
+    if (!canAct) return false;
+    return attackIds.has(cardId) || transferIds.has(cardId) || (legal.defend || []).some((o) => o.cardId === cardId);
+  }
+
+  if (!room) return null;
+
+  const waiting = room.status === 'waiting' || !game;
 
   return (
     <div className="table-screen">
-      <div className="table-top">
+      <header className="table-screen__head">
         <button type="button" className="icon-btn" onClick={onLeave} aria-label="Выйти из стола">
           ←
         </button>
-        <div className="col" style={{ gap: 0 }}>
-          <span className="strong">{room.name}</span>
-          <span className="hint">
-            {room.players.length}/{room.maxPlayers} игроков · код {room.code || '—'}
+        <div className="table-screen__title">
+          {room.name}
+          <span className="small muted">
+            {room.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · {room.players.length}/{room.maxPlayers}
           </span>
         </div>
-        <button type="button" className="icon-btn" onClick={copyCode} aria-label="Скопировать код">
-          ⧉
+        {secondsLeft !== null && !waiting ? (
+          <span className="chip chip--pulse">{secondsLeft} с</span>
+        ) : (
+          <button type="button" className="chip" onClick={copyCode}>
+            {room.code || room.id}
+          </button>
+        )}
+        <button
+          type="button"
+          className={`icon-btn ${showChat ? 'icon-btn--active' : ''}`}
+          onClick={() => setShowChat((prev) => !prev)}
+          aria-label="Чат"
+        >
+          ✎
         </button>
-      </div>
+        <button
+          type="button"
+          className={`icon-btn ${showVoice ? 'icon-btn--active' : ''}`}
+          onClick={() => setShowVoice((prev) => !prev)}
+          aria-label="Голос"
+        >
+          ♪
+        </button>
+      </header>
 
-      {waiting ? (
-        <>
-          <div className={`felt ${feltClass} felt--waiting`}>
-            <div className="felt__inner">
-              <div className="felt__title">Ожидание игроков</div>
-              <div className="felt__sub">
-                Готовы {readyCount} из {room.players.length}
-              </div>
-              <div className="seat-list">
-                {room.players.map((player) => (
-                  <div className="seat-row" key={player.userId}>
-                    <span className={player.connected ? 'dot' : 'dot dot--off'} />
-                    <span className="strong">{player.username}</span>
-                    {player.isOwner ? <span className="pill">хост</span> : null}
-                    <span className="hint" style={{ marginLeft: 'auto' }}>
-                      {player.ready ? 'готов' : 'не готов'}
-                    </span>
-                  </div>
-                ))}
-              </div>
+      <div className={`felt ${feltClass}`}>
+        <div className="seat-row">
+          {players.map((player) => (
+            <Seat
+              key={player.userId}
+              player={player}
+              isMe={player.userId === myId}
+              isTurn={player.userId === game?.turnUserId}
+              deckClass={deckClass}
+            />
+          ))}
+        </div>
+
+        {waiting ? (
+          <div className="waiting">
+            <div className="waiting__orbit" aria-hidden="true">
+              <i />
+              <i />
+              <i />
             </div>
-          </div>
-
-          <div className="actions">
-            {isOwner ? (
-              <button
-                type="button"
-                className="btn btn--primary btn--wide"
-                onClick={() => {
-                  haptic('light');
-                  send({ type: 'room:start' });
-                }}
-                disabled={room.players.length < 2}
-              >
-                {room.players.length < 2 ? 'Нужен второй игрок' : 'Начать игру'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn--primary btn--wide"
-                onClick={() => {
-                  haptic('light');
-                  send({ type: 'room:ready', ready: !myPlayer?.ready });
-                }}
-              >
-                {myPlayer?.ready ? 'Не готов' : 'Готов'}
-              </button>
-            )}
-            <button type="button" className="btn btn--ghost" onClick={() => setChatOpen(true)}>
-              Чат
-            </button>
-            {isOwner && allReady ? <span className="hint">Все готовы — можно начинать</span> : null}
-          </div>
-        </>
-      ) : null}
-
-      {game ? (
-        <>
-          <div className="table-meta">
-            <span className="pill">
-              Козырь {game.trumpCard ? `${game.trumpCard.rank}${suitSymbol(game.trumpSuit)}` : '—'}
+            <span className="waiting__count">
+              {room.players.length} / {room.maxPlayers} игроков
             </span>
-            <span className="pill">Колода: {game.deckCount}</span>
-            <span className="pill">Раунд {game.round}</span>
-            {secondsLeft !== null ? (
-              <span className={`pill ${secondsLeft <= 10 ? 'pill--danger' : ''}`}>{secondsLeft} с</span>
-            ) : null}
-          </div>
-
-          <div className="seats-strip">
-            {others.map((player) => (
-              <Seat
-                key={player.userId}
-                player={player}
-                gamePlayer={game.players.find((item) => item.userId === player.userId)}
-                deckClass={deckClass}
-                muted={voiceState.muted.includes(player.userId)}
-                onToggleMute={toggleMutePlayer}
-                isSelf={false}
-              />
-            ))}
-            {others.length === 0 ? <div className="hint">Ожидание соперника…</div> : null}
-          </div>
-
-          <div className={`felt ${feltClass}`}>
-            <div className="felt__inner">
-              <div className="felt__deck">
-                <CardBack deckClass={deckClass} size="sm" />
-                <span className="felt__deck-count">{game.deckCount}</span>
-                {game.trumpCard ? (
-                  <div className="felt__trump">
-                    <PlayingCard card={game.trumpCard} size="xs" />
-                    <span className="felt__trump-suit">{suitSymbol(game.trumpSuit)}</span>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="trick">
-                {table.length === 0 ? (
-                  <div className="trick__empty">Стол пуст</div>
-                ) : (
-                  table.map((pair) => (
-                    <div className="trick__pair" key={pair.attack.id}>
-                      <PlayingCard card={pair.attack} size="sm" />
-                      {pair.defend ? (
-                        <PlayingCard card={pair.defend} size="sm" />
-                      ) : (
-                        <div className="trick__slot" />
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {game.phase === 'defend' ? (
-                <div className="felt__hint">
-                  {iAmDefender ? 'Отбивайтесь или возьмите карты' : 'Соперник отбивается'}
-                </div>
-              ) : (
-                <div className="felt__hint">
-                  {game.canAct && !iAmDefender ? 'Ваш ход — подкиньте карту' : 'Ход соперника'}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="my-hand">
-            <div className="my-hand__head">
-              <span className="hint">Ваши карты: {myCardsLeft}</span>
-              {myPlayer ? (
-                <span className="hint">
-                  {game.players.find((player) => player.userId === myId)?.isAttacker
-                    ? 'вы атакуете'
-                    : game.players.find((player) => player.userId === myId)?.isDefender
-                      ? 'вы отбиваетесь'
-                      : ''}
-                </span>
+            <p className="muted small center" style={{ margin: 0 }}>
+              Код комнаты <b>{room.code || room.id}</b> — отправьте другу. Ботов за столом нет.
+            </p>
+            <div className="table-actions">
+              <button type="button" className="btn btn--soft btn--sm" onClick={copyCode}>
+                Скопировать код
+              </button>
+              <button
+                type="button"
+                className="btn btn--soft btn--sm"
+                onClick={() => send({ type: 'room:ready' })}
+              >
+                {room.you?.ready ? 'Не готов' : 'Готов'}
+              </button>
+              {room.you?.isOwner ? (
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={room.players.length < 2}
+                  onClick={() => send({ type: 'room:start' })}
+                >
+                  Начать игру
+                </button>
               ) : null}
             </div>
-            <div className="hand-scroll">
-              {myHand.map((card) => (
-                <PlayingCard
-                  key={card.id}
-                  card={card}
-                  size="md"
-                  onClick={() => playCard(card)}
-                  disabled={!game.canAct}
-                />
+            <div className="seats-dots">
+              {room.players.map((player) => (
+                <span key={player.userId} className={`seat-dot ${player.connected ? 'seat-dot--on' : ''}`}>
+                  {player.username}
+                  {player.ready ? ' ✓' : ''}
+                </span>
               ))}
-              {myHand.length === 0 ? <span className="hint">Карт нет</span> : null}
             </div>
           </div>
+        ) : (
+          <>
+            <div className="table-center">
+              <div className="deck-stack">
+                <CardBack deckClass={deckClass} />
+                <span className="deck-stack__count">{game.deckCount}</span>
+              </div>
+              {game.trumpCard ? (
+                <div className="trump">
+                  <PlayingCard card={game.trumpCard} size="xs" />
+                  <span className="small muted">козырь {suitSymbol(game.trumpSuit)}</span>
+                </div>
+              ) : null}
+            </div>
 
-          <div className="actions actions--game">
-            {game.canAct && iAmDefender ? (
-              <button type="button" className="btn btn--soft" onClick={() => act({ type: 'take' })}>
-                Взять
-              </button>
-            ) : null}
-            {game.canAct && !iAmDefender && table.length > 0 ? (
-              <button type="button" className="btn btn--primary" onClick={() => act({ type: 'end' })}>
-                Бито
-              </button>
-            ) : null}
+            <div className="attack-row">
+              {table.length === 0 ? (
+                <div className="table-empty">Стол пуст · {isDefender ? 'защита' : 'атака'}</div>
+              ) : (
+                table.map((slot) => (
+                  <button
+                    key={slot.attack.id}
+                    type="button"
+                    className="attack-slot"
+                    onClick={() => onSlotClick(slot)}
+                    disabled={!isDefender}
+                  >
+                    <PlayingCard card={slot.attack} size="sm" />
+                    {slot.defend ? (
+                      <span className="attack-slot__defend">
+                        <PlayingCard card={slot.defend} size="sm" />
+                      </span>
+                    ) : (
+                      <span className="attack-slot__defend attack-slot__defend--empty" aria-hidden="true" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="turn-banner">
+              {game.finished
+                ? 'Партия завершена'
+                : canAct
+                ? isDefender
+                  ? 'Ваш ход: отбивайтесь или возьмите карты'
+                  : 'Ваш ход: подкиньте карту или скажите «бито»'
+                : turnPlayer
+                ? `Ход: ${turnPlayer.name}`
+                : 'Ожидание соперника'}
+            </div>
+
+            <div className="hand">
+              {hand.map((card) => {
+                const playable = cardPlayable(card.id);
+                return (
+                  <span key={card.id} className={`hand__card ${playable ? 'hand__card--playable' : 'hand__card--dim'}`}>
+                    <PlayingCard
+                      card={card}
+                      size="sm"
+                      deckClass={deckClass}
+                      selected={selected === card.id}
+                      onClick={() => setSelected((prev) => (prev === card.id ? null : card.id))}
+                    />
+                  </span>
+                );
+              })}
+              {hand.length === 0 ? <span className="muted small">Карт нет</span> : null}
+            </div>
+
+            <div className="table-actions">
+              {canAct && !isDefender ? (
+                <>
+                  <button type="button" className="btn btn--primary btn--sm" onClick={playAttack} disabled={!selected}>
+                    {table.length === 0 ? 'Атаковать' : 'Подкинуть'}
+                  </button>
+                  {transferIds.size > 0 ? (
+                    <button
+                      type="button"
+                      className="btn btn--soft btn--sm"
+                      onClick={playTransfer}
+                      disabled={!selected || !transferIds.has(selected)}
+                    >
+                      Перевести
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn btn--soft btn--sm"
+                    onClick={() => send({ type: 'end' })}
+                    disabled={!legal.canEnd}
+                  >
+                    Бито
+                  </button>
+                </>
+              ) : null}
+
+              {canAct && isDefender ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => playDefend()}
+                    disabled={!selected || defendOptions.length === 0}
+                  >
+                    Отбить
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--danger btn--sm"
+                    onClick={() => {
+                      send({ type: 'take' });
+                      setSelected(null);
+                    }}
+                    disabled={!legal.canTake}
+                  >
+                    Взять
+                  </button>
+                  {transferIds.size > 0 ? (
+                    <button
+                      type="button"
+                      className="btn btn--soft btn--sm"
+                      onClick={playTransfer}
+                      disabled={!selected || !transferIds.has(selected)}
+                    >
+                      Перевести
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+
+              {!canAct ? <span className="table-note">Ждём ход соперника…</span> : null}
+            </div>
+          </>
+        )}
+
+        {room.finished && room.result ? (
+          <div className="result">
+            <div className="result__card">
+              <span className="result__title">
+                {room.result.loserId === myId ? 'Вы проиграли' : 'Вы победили'}
+              </span>
+              <span className="result__sub">
+                {room.result.loserName ? `Дурак: ${room.result.loserName}` : 'Партия завершена'}
+              </span>
+              <div className="result__actions">
+                {room.you?.isOwner ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => send({ type: 'room:start' })}
+                  >
+                    Играть снова
+                  </button>
+                ) : null}
+                <button type="button" className="btn btn--soft btn--sm" onClick={onLeave}>
+                  Выйти
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {showVoice ? (
+        <div className="voice-panel">
+          <div className="voice-bar">
             <button
               type="button"
-              className={`btn ${voiceState.micOn ? 'btn--danger' : 'btn--soft'}`}
+              className={`mic ${micOn ? 'mic--on' : ''}`}
               onClick={toggleMic}
+              aria-pressed={micOn}
             >
-              {voiceState.micOn ? 'Выкл. микрофон' : 'Микрофон'}
+              {micOn ? 'Микрофон включён' : 'Включить микрофон'}
             </button>
-            <button
-              type="button"
-              className="btn btn--soft"
-              onClick={() => (voiceState.muted.length ? voice?.unmuteAll() : voice?.muteAll())}
-            >
-              {voiceState.muted.length ? 'Включить всех' : 'Заглушить всех'}
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={() => setChatOpen(true)}>
-              Чат
+            <button type="button" className="voice-chip" onClick={muteAll}>
+              {muted.size >= peers.length && peers.length > 0 ? 'Включить всех' : 'Заглушить всех'}
             </button>
           </div>
-        </>
-      ) : null}
-
-      {finished ? (
-        <div className="result-panel">
-          <div className="result-panel__title">
-            {finished.loserId && finished.loserId !== myId ? 'Вы победили' : 'Партия завершена'}
-          </div>
-          <p className="hint">
-            {(finished.players || [])
-              .map((player) => player.name)
-              .filter(Boolean)
-              .join(', ') || 'Итоги сохранены в статистике'}
-          </p>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {isOwner ? (
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => {
-                  haptic('light');
-                  send({ type: 'room:start' });
-                }}
-              >
-                Новая партия
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => {
-                  haptic('light');
-                  send({ type: 'room:ready', ready: true });
-                }}
-              >
-                Готов к новой
-              </button>
-            )}
-            <button type="button" className="btn btn--ghost" onClick={onLeave}>
-              В лобби
-            </button>
-          </div>
+          {peers.length === 0 ? (
+            <p className="muted small">В комнате пока нет других игроков.</p>
+          ) : (
+            (room.players || [])
+              .filter((player) => player.userId !== myId)
+              .map((player) => (
+                <div key={player.userId} className="voice-row">
+                  <span className="voice-row__name">
+                    {player.username}
+                    {player.mic ? <span className="voice-chip voice-chip--live">говорит</span> : null}
+                  </span>
+                  <button
+                    type="button"
+                    className={`voice-chip ${muted.has(player.userId) ? 'voice-chip--on' : ''}`}
+                    onClick={() => toggleMute(player.userId)}
+                  >
+                    {muted.has(player.userId) ? 'Включить' : 'Заглушить'}
+                  </button>
+                </div>
+              ))
+          )}
         </div>
       ) : null}
 
-      {chatOpen ? (
-        <div className="sheet-backdrop" onClick={() => setChatOpen(false)}>
-          <div className="sheet sheet--chat" onClick={(event) => event.stopPropagation()}>
-            <div className="sheet__grab" />
-            <div className="row row--between">
-              <h3 className="sheet__title" style={{ margin: 0 }}>
-                Чат стола
-              </h3>
-              <button type="button" className="icon-btn" onClick={() => setChatOpen(false)}>
-                ✕
-              </button>
-            </div>
-            <Chat
-              messages={room.chat || []}
-              onSend={(text) => send({ type: 'chat', text })}
-              onEmoji={(emoji) => send({ type: 'chat:emoji', emoji })}
-              limit={30}
-            />
+      {showChat ? (
+        <div className="chat">
+          <div className="chat__head">
+            <span className="chat__title">Чат стола</span>
+            <button type="button" className="chat__close" onClick={() => setShowChat(false)} aria-label="Закрыть чат">
+              ✕
+            </button>
           </div>
+          <Chat chat={room.chat || []} me={user} send={send} />
         </div>
       ) : null}
     </div>
   );
 }
+
+export default TableScreen;
