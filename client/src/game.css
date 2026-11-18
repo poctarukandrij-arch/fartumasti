@@ -1,0 +1,464 @@
+/* Игровое поле, рука, лобби стола и визуалы предметов магазина. */
+
+.table-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 12px 18px;
+  min-height: 100%;
+  animation: fade-in 220ms ease both;
+}
+
+.table-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-top .col {
+  flex: 1;
+  min-width: 0;
+}
+
+.table-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill--danger {
+  color: #ff6b81;
+  border-color: rgba(255, 77, 109, 0.4);
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.seats-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.felt {
+  position: relative;
+  border-radius: 18px;
+  border: 1px solid #262b34;
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, #14171d, #0d0f13);
+  overflow: hidden;
+  padding: 12px;
+}
+
+.felt--waiting {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+}
+
+.felt__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-height: 150px;
+}
+
+.felt__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #eef1f6;
+}
+
+.felt__sub {
+  font-size: 13px;
+  color: #8d95a4;
+}
+
+.felt__deck {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.felt__deck-count {
+  font-size: 11px;
+  color: #8d95a4;
+  font-variant-numeric: tabular-nums;
+}
+
+.felt__trump {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #262b34;
+}
+
+.felt__trump-suit {
+  font-size: 15px;
+  color: #e8ebf1;
+}
+
+.trick {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 104px;
+  padding: 6px;
+}
+
+.trick__empty {
+  align-self: center;
+  color: #5d6572;
+  font-size: 13px;
+}
+
+.trick__pair {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  animation: pop-in 180ms ease both;
+}
+
+.trick__slot {
+  width: 42px;
+  height: 60px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.felt__hint {
+  text-align: center;
+  font-size: 12px;
+  color: #8d95a4;
+  min-height: 16px;
+}
+
+.my-hand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.my-hand__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hand-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  scroll-snap-type: x proximity;
+}
+
+.hand-scroll .playing-card {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+}
+
+.actions--game {
+  flex-wrap: wrap;
+}
+
+.seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #22262e;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #37d39b;
+  display: inline-block;
+}
+
+.dot--off {
+  background: #5d6572;
+}
+
+.dot--lg {
+  width: 9px;
+  height: 9px;
+}
+
+.result-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(91, 140, 255, 0.12), rgba(15, 17, 22, 0.9));
+  border: 1px solid rgba(91, 140, 255, 0.28);
+}
+
+.result-panel__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #eef1f6;
+}
+
+.sheet--chat {
+  max-height: 74vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Колоды */
+.deck-back--graphite {
+  background: linear-gradient(150deg, #2a313d, #14181f);
+}
+
+.deck-back--neon {
+  background: linear-gradient(150deg, #1a2340, #0c111c);
+  box-shadow: inset 0 0 12px rgba(91, 140, 255, 0.35);
+}
+
+.deck-back--frost {
+  background: linear-gradient(150deg, #2b3a4a, #16202a);
+  box-shadow: inset 0 0 12px rgba(120, 200, 255, 0.25);
+}
+
+.deck-back--ember {
+  background: linear-gradient(150deg, #3a1d22, #180d10);
+  box-shadow: inset 0 0 12px rgba(255, 77, 109, 0.3);
+}
+
+.deck-back--matrix {
+  background:
+    repeating-linear-gradient(90deg, rgba(55, 211, 155, 0.18) 0 1px, transparent 1px 6px),
+    linear-gradient(150deg, #10201a, #08120e);
+}
+
+.deck-back--void {
+  background: radial-gradient(120% 120% at 30% 20%, #2a2140, #0a0812);
+}
+
+.deck-back--steel {
+  background: linear-gradient(150deg, #3a3f47, #1b1e23);
+  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.12);
+}
+
+.deck-back--signal {
+  background:
+    repeating-linear-gradient(45deg, rgba(91, 140, 255, 0.22) 0 4px, transparent 4px 9px),
+    linear-gradient(150deg, #1d2430, #0f1319);
+}
+
+.deck-back--titan {
+  background: linear-gradient(150deg, #2c3037, #101215);
+  box-shadow: inset 0 0 14px rgba(180, 190, 210, 0.22);
+}
+
+.deck-back--black {
+  background: linear-gradient(150deg, #14161a, #05060a);
+  box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.06);
+}
+
+/* Оформление стола */
+.felt--graphite {
+  border-color: #2a2f38;
+}
+
+.felt--emerald {
+  background: radial-gradient(90% 70% at 50% 0%, rgba(55, 211, 155, 0.14), transparent 70%),
+    linear-gradient(180deg, #10201a, #08120e);
+  border-color: #1f3b31;
+}
+
+.felt--ocean {
+  background: radial-gradient(90% 70% at 50% 0%, rgba(91, 140, 255, 0.16), transparent 70%),
+    linear-gradient(180deg, #101a2b, #080d16);
+  border-color: #1f2c42;
+}
+
+.felt--aurora {
+  background: radial-gradient(90% 70% at 20% 0%, rgba(139, 108, 255, 0.18), transparent 65%),
+    radial-gradient(80% 70% at 80% 20%, rgba(55, 211, 155, 0.12), transparent 65%),
+    linear-gradient(180deg, #141326, #0a0a12);
+  border-color: #2b2748;
+}
+
+.felt--lava {
+  background: radial-gradient(90% 70% at 50% 0%, rgba(255, 107, 90, 0.16), transparent 70%),
+    linear-gradient(180deg, #22120f, #120a09);
+  border-color: #3d1f1a;
+}
+
+.felt--midnight {
+  background: radial-gradient(90% 70% at 50% 0%, rgba(255, 255, 255, 0.06), transparent 70%),
+    linear-gradient(180deg, #0e1015, #05070a);
+  border-color: #1c2028;
+}
+
+/* Эффекты появления */
+.aura--ripple {
+  background: radial-gradient(circle at 50% 50%, rgba(91, 140, 255, 0.28), transparent 62%);
+  animation: aura-pulse 2.4s ease-in-out infinite;
+}
+
+.aura--glitch {
+  background: repeating-linear-gradient(0deg, rgba(139, 108, 255, 0.22) 0 2px, transparent 2px 5px);
+  animation: aura-glitch 3s steps(6) infinite;
+}
+
+.aura--lightning {
+  background: radial-gradient(circle at 50% 30%, rgba(180, 210, 255, 0.3), transparent 60%);
+  animation: aura-pulse 1.6s ease-in-out infinite;
+}
+
+.aura--phoenix {
+  background: radial-gradient(circle at 50% 70%, rgba(255, 107, 90, 0.3), transparent 62%);
+  animation: aura-pulse 2s ease-in-out infinite;
+}
+
+/* Покупка кейса */
+.case-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #161a21, #0f1116);
+  border: 1px solid #262b34;
+  overflow: hidden;
+}
+
+.case-card__glow {
+  position: absolute;
+  inset: -40% -10% auto -10%;
+  height: 120px;
+  background: radial-gradient(circle at 50% 0%, rgba(91, 140, 255, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  border: 1px solid #22262e;
+  overflow: hidden;
+}
+
+.preview__deck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview__card {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 44px;
+  border-radius: 6px;
+  border: 1px solid #2c323d;
+}
+
+.preview__chip {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.preview__stripe {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  height: 2px;
+  border-radius: 2px;
+}
+
+.preview__table {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76%;
+  height: 66%;
+  border-radius: 12px;
+  border: 1px solid #2a2f38;
+}
+
+.preview__emoji {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.preview__effect {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: block;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.shop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #12151a;
+  border: 1px solid #23272f;
+}
+
+.shop-item--active {
+  border-color: rgba(91, 140, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.2) inset;
+}
+
+.rarity {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@keyframes aura-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes aura-glitch {
+  0%, 100% { transform: translateX(0); opacity: 0.7; }
+  50% { transform: translateX(2px); opacity: 1; }
+}
