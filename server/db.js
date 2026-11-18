@@ -166,6 +166,24 @@ CREATE TABLE IF NOT EXISTS error_logs (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS case_openings (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  case_id TEXT NOT NULL,
+  item_id TEXT,
+  rarity TEXT,
+  price INTEGER NOT NULL,
+  refund INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS case_requests (
+  request_id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  opening_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_results_user ON match_results (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_user ON inventory (user_id);
@@ -173,7 +191,19 @@ CREATE INDEX IF NOT EXISTS idx_chat_room ON chat_logs (room_id, created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_provider ON payments (provider_id);
 CREATE INDEX IF NOT EXISTS idx_payments_user ON payments (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_case_openings_user ON case_openings (user_id, created_at DESC);
 `;
+
+/** Добавляет колонку, если её ещё нет — безопасная миграция без потери данных. */
+function ensureColumn(table, column, definition) {
+  try {
+    const info = raw.exec(`PRAGMA table_info(${table})`);
+    const names = info.length ? info[0].values.map((row) => row[1]) : [];
+    if (!names.includes(column)) raw.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch (err) {
+    console.error(`[db] миграция ${table}.${column} не удалась:`, err.message);
+  }
+}
 
 function schedulePersist() {
   if (!ready) return;
@@ -209,6 +239,7 @@ export async function initDb() {
     : new SQL.Database();
   raw.run('PRAGMA foreign_keys = ON;');
   raw.run(SCHEMA);
+  ensureColumn('users', 'unlimited', 'INTEGER NOT NULL DEFAULT 0');
   ready = true;
   persistNow();
   return db;
