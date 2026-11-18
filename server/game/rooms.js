@@ -185,12 +185,12 @@ export function createRoomManager({
     room.finishedRecorded = true;
     room.status = 'finished';
     const state = room.game;
-    const loser = state.players.find((p) => p.id === state.loserId) || null;
-    const winners = state.players.filter((p) => p.id !== state.loserId);
+    const loser = state.players.find((p) => p.userId === state.loserId) || null;
+    const winners = state.players.filter((p) => p.userId !== state.loserId);
     room.result = {
-      loserId: loser?.id || null,
+      loserId: loser?.userId || null,
       loserName: loser?.name || '—',
-      winners: winners.map((p) => ({ userId: p.id, name: p.name })),
+      winners: winners.map((p) => ({ userId: p.userId, name: p.name })),
       finishedAt: state.finishedAt || Date.now(),
       rounds: state.round || 0,
     };
@@ -198,11 +198,18 @@ export function createRoomManager({
     if (room.matchId) {
       const finishedAt = room.result.finishedAt;
       db.run(
-        'UPDATE matches SET status = ?, ended_at = ?, rounds = ?, loser_id = ? WHERE id = ?',
-        ['finished', finishedAt, room.result.rounds, room.result.loserId, room.matchId],
+        'UPDATE matches SET status = ?, ended_at = ?, rounds = ?, loser_id = ?, players_json = ? WHERE id = ?',
+        [
+          'finished',
+          finishedAt,
+          room.result.rounds,
+          room.result.loserId,
+          JSON.stringify(state.players.map((p) => ({ userId: p.userId, name: p.name }))),
+          room.matchId,
+        ],
       );
       for (const player of state.players) {
-        const isWinner = player.id !== state.loserId;
+        const isWinner = player.userId !== state.loserId;
         const cardsLeft = player.hand.length;
         db.run(
           `INSERT INTO match_results (match_id, user_id, is_winner, place, cards_left, created_at)
@@ -236,8 +243,8 @@ export function createRoomManager({
 
   function startGame(room) {
     if (room.players.length < 2) throw new RoomError('За столом нужно минимум два игрока', 'NOT_ENOUGH_PLAYERS');
-    const infos = room.players.map((p, index) => ({ id: p.userId, name: p.username, seat: index }));
-    const game = createGame({ players: infos, rng: Math.random });
+    const infos = room.players.map((p, index) => ({ userId: p.userId, name: p.username, seat: index }));
+    const game = createGame(infos, Math.random);
     room.game = game;
     room.status = 'playing';
     room.finishedRecorded = false;
@@ -307,13 +314,12 @@ export function createRoomManager({
 
     const wasPlaying = room.status === 'playing' && room.game && !room.game.finished;
     if (wasPlaying) {
-      const outcome = handlePlayerLeft(room.game, userId);
-      if (outcome?.finished) finalizeGame(room);
+      handlePlayerLeft(room.game, userId);
+      if (room.game.finished) finalizeGame(room);
       else persistRoom(room);
     }
 
     room.players = room.players.filter((p) => p.userId !== userId);
-    room.chat = room.chat.filter((m) => m.userId !== userId ? true : true);
     const voice = voiceState.get(room.id);
     if (voice) delete voice[userId];
 
@@ -354,7 +360,8 @@ export function createRoomManager({
     if (!room.game || room.game.finished) return;
     if (Date.now() - (room.game.turnStartedAt || 0) < turnTimeoutMs) return;
     const outcome = autoAction(room.game);
-    if (outcome?.changed) {
+    if (outcome) {
+      applyAction(room.game, outcome.userId, outcome.action);
       persistRoom(room);
       broadcastRoom(room);
       if (room.game.finished) finalizeGame(room);
@@ -394,7 +401,7 @@ export function createRoomManager({
     const clean = sanitizeMessage(text, 30);
     if (!clean) throw new RoomError('Пустое сообщение', 'EMPTY_MESSAGE');
     const verdict = checkMessage(clean);
-    if (!verdict.allowed) {
+    if (!verdict.ok) {
       db.run(
         'INSERT INTO chat_logs (room_id, user_id, text, blocked, reason, created_at) VALUES (?, ?, ?, 1, ?, ?)',
         [room.id, userId, clean, verdict.reason, now],
