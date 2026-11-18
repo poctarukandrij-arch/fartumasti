@@ -967,3 +967,39 @@
   .playing-card__center { font-size: 29px; }
   .attack-slot { width: 62px; height: 88px; }
 }
+
+/* --- дополнения: чат от себя, список игроков в ожидании --- */
+.chat__msg--mine .chat__author {
+  color: var(--accent-2, #8ea6ff);
+}
+
+.seats-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.seat-dot {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim, #8b93a7);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.seat-dot--on {
+  color: var(--text, #eef1f8);
+  border-color: rgba(120, 160, 255, 0.35);
+  background: rgba(90, 120, 255, 0.12);
+}
+
+.attack-slot__defend--empty {
+  display: block;
+  width: 46px;
+  height: 64px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+}
