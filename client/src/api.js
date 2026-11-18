@@ -56,7 +56,9 @@ export async function api(path, options = {}) {
 
   if (!res.ok) {
     if (res.status === 401 && path !== '/auth/telegram') setToken('');
-    throw new ApiError(data.error || 'Ошибка запроса', res.status, data.code);
+    const code =
+      data.code || (typeof data.error === 'string' && /^[A-Z][A-Z0-9_]+$/.test(data.error) ? data.error : 'error');
+    throw new ApiError(data.message || data.error || 'Ошибка запроса', res.status, code);
   }
   return data;
 }
