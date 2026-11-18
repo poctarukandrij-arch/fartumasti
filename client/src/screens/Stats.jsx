@@ -1,123 +1,125 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { rub, shortDate } from '../utils.js';
+import { rub, shortDate, relativeTime } from '../utils.js';
 
-export default function Stats({ me, toast }) {
+const TABS = [
+  { id: 'games', label: 'История игр' },
+  { id: 'money', label: 'Операции' },
+  { id: 'buys', label: 'Покупки' },
+];
+
+export function Stats({ me, toast }) {
+  const [tab, setTab] = useState('games');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('games');
-
-  const load = useCallback(async () => {
-    try {
-      const next = await api('/stats');
-      setData(next);
-    } catch (error) {
-      toast(error.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let alive = true;
+    api('/stats')
+      .then((payload) => {
+        if (alive) setData(payload);
+      })
+      .catch((error) => toast(error.message, 'error'))
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [toast]);
 
-  const stats = data?.stats || me.stats;
+  const stats = data?.stats || me?.stats || { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0 };
   const history = data?.history || [];
   const transactions = data?.transactions || [];
   const purchases = data?.purchases || [];
 
   return (
     <div className="screen">
-      <h1 className="title">Статистика</h1>
+      <div className="section__head">
+        <h2 className="h2">Статистика</h2>
+        <span className="section__hint">{stats.gamesPlayed} партий</span>
+      </div>
 
-      <div className="panel grid-2" style={{ gap: 12 }}>
-        <div>
-          <div className="hint">Сыграно партий</div>
-          <div className="metric">{stats.gamesPlayed}</div>
+      <div className="stat-grid">
+        <div className="stat">
+          <span className="stat__label">Партии</span>
+          <span className="stat__value">{stats.gamesPlayed}</span>
         </div>
-        <div>
-          <div className="hint">Побед</div>
-          <div className="metric metric--good">{stats.wins}</div>
+        <div className="stat">
+          <span className="stat__label">Победы</span>
+          <span className="stat__value stat__value--accent">{stats.wins}</span>
         </div>
-        <div>
-          <div className="hint">Поражений</div>
-          <div className="metric metric--bad">{stats.losses}</div>
+        <div className="stat">
+          <span className="stat__label">Поражения</span>
+          <span className="stat__value">{stats.losses}</span>
         </div>
-        <div>
-          <div className="hint">Процент побед</div>
-          <div className="metric">{stats.winRate}%</div>
+        <div className="stat">
+          <span className="stat__label">Процент побед</span>
+          <span className="stat__value">{stats.winRate}%</span>
         </div>
       </div>
 
-      <div className="progress" aria-hidden="true">
-        <span className="progress__bar" style={{ width: `${Math.min(100, stats.winRate)}%` }} />
-      </div>
-
-      <div className="chips-scroll">
-        {[
-          { id: 'games', title: 'История игр' },
-          { id: 'money', title: 'Финансы' },
-          { id: 'purchases', title: 'Покупки' },
-        ].map((item) => (
+      <div className="tabs" role="tablist">
+        {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
-            className={`chip ${tab === item.id ? 'chip--active' : ''}`}
+            role="tab"
+            aria-selected={tab === item.id}
+            className={`tabs__btn ${tab === item.id ? 'tabs__btn--active' : ''}`}
             onClick={() => setTab(item.id)}
           >
-            {item.title}
+            {item.label}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="empty">
-          <span className="spinner" />
+        <div className="list">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="skeleton" style={{ height: 58, marginBottom: 8 }} />
+          ))}
         </div>
       ) : tab === 'games' ? (
         history.length === 0 ? (
-          <div className="empty">
-            <div className="empty__title">Партий пока нет</div>
-            <p className="hint">Сыграйте первую партию — история появится здесь.</p>
-          </div>
+          <div className="empty">Вы ещё не сыграли ни одной партии. Начните с главного экрана.</div>
         ) : (
-          <div className="col">
-            {history.map((match) => (
-              <div className="panel row row--between" key={`${match.matchId}_${match.endedAt}`}>
-                <div className="col" style={{ gap: 2 }}>
-                  <div className="row" style={{ gap: 8 }}>
-                    <span className={`dot dot--lg`} style={{ background: match.isWinner ? '#37d39b' : '#ff4d6d' }} />
-                    <span className="strong">{match.isWinner ? 'Победа' : 'Поражение'}</span>
-                    <span className="hint">{match.rounds} раундов</span>
-                  </div>
-                  <div className="hint">
-                    {(match.players || []).join(', ') || '—'}
-                    {match.durakName ? ` · дурак: ${match.durakName}` : ''}
-                  </div>
-                </div>
-                <span className="hint mono">{shortDate(match.endedAt)}</span>
+          <div className="list">
+            {history.map((row) => (
+              <div key={row.matchId} className="list__row">
+                <span className={`list__ico ${row.isWinner ? 'list__ico--win' : ''}`} aria-hidden="true">
+                  {row.isWinner ? '★' : '·'}
+                </span>
+                <span className="list__body">
+                  <span className="list__title">
+                    {row.isWinner ? 'Победа' : 'Поражение'}
+                    {row.durakName ? ` · дурак: ${row.durakName}` : ''}
+                  </span>
+                  <span className="list__sub">
+                    {relativeTime(row.endedAt)} · {row.rounds || 0} раундов · {(row.players || []).join(', ')}
+                  </span>
+                </span>
+                <span className="list__value">{row.place ? `${row.place} место` : shortDate(row.endedAt)}</span>
               </div>
             ))}
           </div>
         )
       ) : tab === 'money' ? (
         transactions.length === 0 ? (
-          <div className="empty">
-            <div className="empty__title">Операций пока нет</div>
-            <p className="hint">Здесь появятся пополнения, списания и выигрыши.</p>
-          </div>
+          <div className="empty">Операций пока нет.</div>
         ) : (
-          <div className="col">
+          <div className="list">
             {transactions.map((row) => {
-              const amount = Number(row.amount ?? row.delta ?? 0);
+              const amount = Number(row.amount ?? row.value ?? 0);
+              const title = row.reason || row.title || row.kind || row.type || 'Операция';
               return (
-                <div className="panel row row--between" key={row.id || `${row.createdAt}_${amount}`}>
-                  <div className="col" style={{ gap: 2 }}>
-                    <span className="strong">{row.description || row.kind || 'Операция'}</span>
-                    <span className="hint mono">{shortDate(row.createdAt ?? row.created_at)}</span>
-                  </div>
-                  <span className={`amount ${amount >= 0 ? 'amount--in' : 'amount--out'}`}>
+                <div key={row.id} className="list__row">
+                  <span className="list__ico" aria-hidden="true">₽</span>
+                  <span className="list__body">
+                    <span className="list__title">{title}</span>
+                    <span className="list__sub">{relativeTime(row.createdAt ?? row.created_at)}</span>
+                  </span>
+                  <span className={`list__value ${amount >= 0 ? 'list__value--in' : 'list__value--out'}`}>
                     {amount >= 0 ? '+' : '−'}
                     {rub(Math.abs(amount))}
                   </span>
@@ -127,19 +129,19 @@ export default function Stats({ me, toast }) {
           </div>
         )
       ) : purchases.length === 0 ? (
-        <div className="empty">
-          <div className="empty__title">Покупок пока нет</div>
-          <p className="hint">Загляните в магазин за колодами и оформлением.</p>
-        </div>
+        <div className="empty">Покупок пока нет.</div>
       ) : (
-        <div className="col">
+        <div className="list">
           {purchases.map((row) => (
-            <div className="panel row row--between" key={row.id || `${row.itemId}_${row.createdAt}`}>
-              <div className="col" style={{ gap: 2 }}>
-                <span className="strong">{row.name || row.itemId || row.item_id}</span>
-                <span className="hint mono">{shortDate(row.createdAt ?? row.created_at)}</span>
-              </div>
-              <span className="amount amount--out">−{rub(row.price ?? 0)}</span>
+            <div key={row.id} className="list__row">
+              <span className="list__ico" aria-hidden="true">◈</span>
+              <span className="list__body">
+                <span className="list__title">{row.itemName || row.item_id || row.itemId || 'Предмет'}</span>
+                <span className="list__sub">
+                  {row.kind === 'case' ? 'Кейс' : 'Предмет'} · {relativeTime(row.createdAt ?? row.created_at)}
+                </span>
+              </span>
+              <span className="list__value list__value--out">{rub(row.price)}</span>
             </div>
           ))}
         </div>
@@ -147,3 +149,5 @@ export default function Stats({ me, toast }) {
     </div>
   );
 }
+
+export default Stats;
