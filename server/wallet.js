@@ -1,7 +1,7 @@
 // Финансовое ядро: баланс, транзакции, атомарные списания и начисления.
 // Суммы — только целые копейки, у каждой операции уникальный идентификатор.
 import crypto from 'node:crypto';
-import { db } from './db.js';
+import { db, getSetting, setSetting } from './db.js';
 
 export class WalletError extends Error {
   constructor(message, code = 'WALLET_ERROR') {
@@ -44,6 +44,93 @@ export function applyUnlimitedGrant({ userId = null, telegramId = null } = {}) {
     }
   }
   return null;
+}
+
+/** Служебные аккаунты с безлимитным виртуальным балансом. */
+export const UNLIMITED_ACCOUNTS = [
+  { key: 'archi', usernames: ['archi'], envUserId: 'ARCHI_USER_ID', envTelegramId: 'ARCHI_TELEGRAM_ID' },
+  { key: 'boss', usernames: ['boss'], envUserId: 'BOSS_USER_ID', envTelegramId: 'BOSS_TELEGRAM_ID' },
+  { key: 'toni', usernames: ['toni'], envUserId: 'TONI_USER_ID', envTelegramId: 'TONI_TELEGRAM_ID' },
+];
+
+export function unlimitedSettingKey(key) {
+  return `unlimited_user_${key}`;
+}
+
+function grantExisting(userId) {
+  const row = db.get('SELECT id FROM users WHERE id = ?', [userId]);
+  if (!row) return null;
+  setUnlimited(row.id, true);
+  return row.id;
+}
+
+/**
+ * Закрепляет безлимит за аккаунтом и запоминает его внутренний id в settings.
+ * Порядок: явный id из окружения -> Telegram id -> уже сохранённый id ->
+ * одноразовая привязка по имени. После закрепления имя ни на что не влияет:
+ * переименование не выдаёт и не отнимает безлимит.
+ */
+export function resolveUnlimitedAccount({
+  key,
+  usernames = [],
+  envUserId = null,
+  envTelegramId = null,
+  claimByUsername = true,
+} = {}) {
+  if (!key) return null;
+  const settingKey = unlimitedSettingKey(key);
+
+  const explicitId = Number(envUserId || 0) || null;
+  if (explicitId) {
+    const bound = grantExisting(explicitId);
+    if (bound) {
+      setSetting(settingKey, bound);
+      return bound;
+    }
+  }
+
+  const telegramId = envTelegramId ? String(envTelegramId) : null;
+  if (telegramId) {
+    const row = db.get('SELECT id FROM users WHERE telegram_id = ?', [telegramId]);
+    if (row) {
+      setUnlimited(row.id, true);
+      setSetting(settingKey, row.id);
+      return row.id;
+    }
+  }
+
+  const saved = Number(getSetting(settingKey, 0)) || null;
+  if (saved) {
+    const bound = grantExisting(saved);
+    if (bound) return bound;
+  }
+
+  if (!claimByUsername) return null;
+
+  for (const username of usernames) {
+    const rows = db.all('SELECT id FROM users WHERE username = ? COLLATE NOCASE', [username]);
+    if (rows.length === 1) {
+      setUnlimited(rows[0].id, true);
+      setSetting(settingKey, rows[0].id);
+      return rows[0].id;
+    }
+  }
+  return null;
+}
+
+/** Идемпотентно закрепляет безлимит за всеми служебными аккаунтами. */
+export function ensureUnlimitedAccounts() {
+  const bound = {};
+  for (const account of UNLIMITED_ACCOUNTS) {
+    const id = resolveUnlimitedAccount({
+      key: account.key,
+      usernames: account.usernames,
+      envUserId: process.env[account.envUserId] || null,
+      envTelegramId: process.env[account.envTelegramId] || null,
+    });
+    if (id) bound[account.key] = id;
+  }
+  return bound;
 }
 
 function insertTx(userId, kind, amount, title, status, meta) {
