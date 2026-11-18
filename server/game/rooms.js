@@ -65,6 +65,7 @@ export function createRoomManager({
       name: room.name,
       status: room.status,
       maxPlayers: room.maxPlayers,
+      mode: room.mode || room.game?.mode || 'podkidnoy',
       ownerId: room.ownerId,
       createdAt: room.createdAt,
       players: room.players.map((p) => ({
@@ -102,6 +103,7 @@ export function createRoomManager({
         name: room.name,
         players: room.players.length,
         maxPlayers: room.maxPlayers,
+        mode: room.mode || 'podkidnoy',
         status: room.status,
         ownerName: room.players.find((p) => p.userId === room.ownerId)?.username || '—',
       }));
@@ -137,6 +139,7 @@ export function createRoomManager({
         chat: room.chat.slice(-20),
         status: room.status,
         game: room.game,
+        mode: room.mode || room.game?.mode || 'podkidnoy',
         result: room.result,
         matchId: room.matchId,
         createdAt: room.createdAt,
@@ -246,7 +249,7 @@ export function createRoomManager({
   function startGame(room) {
     if (room.players.length < 2) throw new RoomError('За столом нужно минимум два игрока', 'NOT_ENOUGH_PLAYERS');
     const infos = room.players.map((p, index) => ({ userId: p.userId, name: p.username, seat: index }));
-    const game = createGame(infos, Math.random);
+    const game = createGame(infos, Math.random, { mode: room.mode || 'podkidnoy' });
     room.game = game;
     room.status = 'playing';
     room.finishedRecorded = false;
@@ -259,9 +262,10 @@ export function createRoomManager({
     return room;
   }
 
-  function createRoom(user, { maxPlayers = 2, name = null } = {}) {
+  function createRoom(user, { maxPlayers = 2, name = null, mode = 'podkidnoy' } = {}) {
     if (userRoom.has(user.id)) leaveRoom(user.id, { silent: true });
     const size = [2, 3, 4].includes(Number(maxPlayers)) ? Number(maxPlayers) : 2;
+    const gameMode = mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy';
     const code = roomCode();
     const room = {
       id: `room_${crypto.randomUUID()}`,
@@ -269,6 +273,7 @@ export function createRoomManager({
       name: name ? String(name).slice(0, 24) : `Стол ${code}`,
       ownerId: user.id,
       maxPlayers: size,
+      mode: gameMode,
       players: [makePlayer(user)],
       chat: [],
       status: 'waiting',

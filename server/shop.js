@@ -2,11 +2,17 @@
 // Все цены — в копейках. Выдача предметов только на сервере.
 import crypto from 'node:crypto';
 import { db } from './db.js';
-import { credit, debit, WalletError } from './wallet.js';
+import { credit, debit, balanceOf, WalletError } from './wallet.js';
 
 export const NAME_CHANGE_PRICE = 4900; // 49 ₽
 export const WELCOME_BONUS = 25000; // приветственный бонус 250 ₽
 export const CASE_REFUND_RATE = 0.3;
+/** Покупка скинов колод и столов временно отключена по требованию владельца. */
+export const LOCKED_TYPES = ['deck', 'table'];
+
+export function isLockedType(type) {
+  return LOCKED_TYPES.includes(type);
+}
 
 export const RARITIES = {
   common: { label: 'Обычный', color: '#8b93a1', order: 0 },
@@ -149,6 +155,9 @@ function grantItem(userId, itemId, source) {
 export function buyItem(userId, itemId) {
   const item = getItem(itemId);
   if (!item) throw new WalletError('Предмет не найден', 'ITEM_NOT_FOUND');
+  if (isLockedType(item.type)) {
+    throw new WalletError('Покупка карт и столов откроется позже', 'SHOP_SOON');
+  }
   if (item.price <= 0) throw new WalletError('Этот предмет уже доступен', 'ITEM_FREE');
   if (ownsItem(userId, itemId)) throw new WalletError('Этот предмет уже куплен', 'ITEM_OWNED');
   return db.tx(() => {
@@ -176,13 +185,27 @@ function pickRarity(odds, rng) {
   return entries[entries.length - 1][0];
 }
 
-export function openCase(userId, caseId, rng = Math.random) {
+export function openCase(userId, caseId, rng = Math.random, { requestId = null } = {}) {
   const box = getCase(caseId);
   if (!box) throw new WalletError('Кейс не найден', 'CASE_NOT_FOUND');
+  const safeRequest = requestId ? String(requestId).slice(0, 64) : null;
+  // Идемпотентность: повторный запрос с тем же id возвращает сохранённый результат,
+  // награда не начисляется второй раз.
+  if (safeRequest) {
+    const replay = db.get('SELECT opening_id FROM case_requests WHERE request_id = ? AND user_id = ?', [
+      safeRequest,
+      userId,
+    ]);
+    if (replay) {
+      const saved = openingRow(db.get('SELECT * FROM case_openings WHERE id = ?', [replay.opening_id]));
+      if (saved) return { ...saved, case: box, balance: balanceOf(userId), replayed: true };
+    }
+  }
   const owned = ownedItemIds(userId);
   const unowned = box.pool.filter((id) => !owned.has(id));
   return db.tx(() => {
-    const result = debit(userId, box.price, 'case', `Кейс: ${box.name}`, { caseId });
+    const openingId = crypto.randomUUID();
+    const result = debit(userId, box.price, 'case', `Кейс: ${box.name}`, { caseId, openingId });
     db.run('INSERT INTO purchases (user_id, item_id, price, kind, created_at) VALUES (?, ?, ?, ?, ?)', [
       userId,
       caseId,
@@ -200,13 +223,17 @@ export function openCase(userId, caseId, rng = Math.random) {
         `Возврат: все предметы кейса «${box.name}» уже собраны`,
         { caseId },
       );
-      return {
-        case: box,
-        item: null,
-        duplicate: true,
-        refund,
-        balance: creditResult.balance,
-      };
+      db.run(
+        'INSERT INTO case_openings (id, user_id, case_id, item_id, rarity, price, refund, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [openingId, userId, caseId, null, null, box.price, refund, Date.now()],
+      );
+      if (safeRequest) {
+        db.run(
+          'INSERT OR IGNORE INTO case_requests (request_id, user_id, opening_id, created_at) VALUES (?, ?, ?, ?)',
+          [safeRequest, userId, openingId, Date.now()],
+        );
+      }
+      return { openingId, case: box, item: null, duplicate: true, refund, balance: creditResult.balance, replayed: false };
     }
 
     const wantedRarity = pickRarity(box.odds, rng);
@@ -215,14 +242,43 @@ export function openCase(userId, caseId, rng = Math.random) {
     const chosenId = candidates[Math.floor(rng() * candidates.length) % candidates.length];
     const item = getItem(chosenId);
     grantItem(userId, chosenId, `case:${caseId}`);
-    return {
-      case: box,
-      item,
-      duplicate: false,
-      refund: 0,
-      balance: result.balance,
-    };
+    db.run(
+      'INSERT INTO case_openings (id, user_id, case_id, item_id, rarity, price, refund, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [openingId, userId, caseId, chosenId, item.rarity, box.price, 0, Date.now()],
+    );
+    if (safeRequest) {
+      db.run(
+        'INSERT OR IGNORE INTO case_requests (request_id, user_id, opening_id, created_at) VALUES (?, ?, ?, ?)',
+        [safeRequest, userId, openingId, Date.now()],
+      );
+    }
+    return { openingId, case: box, item, duplicate: false, refund: 0, balance: result.balance, replayed: false };
   });
+}
+
+function openingRow(row) {
+  if (!row) return null;
+  const item = row.item_id ? getItem(row.item_id) : null;
+  const box = getCase(row.case_id);
+  return {
+    openingId: row.id,
+    caseId: row.case_id,
+    caseName: box ? box.name : 'Кейс',
+    item: item || null,
+    rarity: row.rarity || (item ? item.rarity : null),
+    price: row.price,
+    refund: row.refund,
+    duplicate: !row.item_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function caseHistory(userId, limit = 20) {
+  const safe = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  return db
+    .all('SELECT * FROM case_openings WHERE user_id = ? ORDER BY created_at DESC LIMIT ?', [userId, safe])
+    .map(openingRow)
+    .filter(Boolean);
 }
 
 export function equipItem(userId, itemId) {
