@@ -1,33 +1,27 @@
 import { useState } from 'react';
-import { api } from '../api.js';
-import { haptic } from '../telegram.js';
-import { rub } from '../utils.js';
+import { api, ApiError } from '../api.js';
+import { Logo } from '../components/Logo.jsx';
 
-const RULES = [
-  '4–12 символов, только английские буквы и цифры.',
-  'Минимум 3 буквы, без пробелов и спецсимволов.',
-  'Имя проверяется на уникальность на сервере.',
-  'Сменить имя позже можно за 49 ₽.',
-];
+const NAME_RE = /^[A-Za-z0-9]{4,12}$/;
 
-export default function Onboarding({ config, onDone, toast }) {
+function validate(name) {
+  if (!name) return 'Придумайте имя';
+  if (!NAME_RE.test(name)) return '4–12 символов: латинские буквы и цифры, без пробелов';
+  const letters = (name.match(/[A-Za-z]/g) || []).length;
+  if (letters < 3) return 'В имени должно быть минимум 3 буквы';
+  return '';
+}
+
+export function Onboarding({ onDone }) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const validate = (value) => {
-    if (!/^[A-Za-z0-9]{4,12}$/.test(value)) {
-      return 'Имя: 4–12 символов, только английские буквы и цифры.';
-    }
-    const letters = value.replace(/[^A-Za-z]/g, '').length;
-    if (letters < 3) return 'В имени должно быть минимум 3 буквы.';
-    return '';
-  };
+  const hint = name ? validate(name) : '';
 
-  const submit = async (event) => {
+  async function submit(event) {
     event.preventDefault();
-    const value = name.trim();
-    const problem = validate(value);
+    const problem = validate(name.trim());
     if (problem) {
       setError(problem);
       return;
@@ -35,67 +29,72 @@ export default function Onboarding({ config, onDone, toast }) {
     setBusy(true);
     setError('');
     try {
-      const data = await api('/auth/name', { method: 'POST', body: { name: value } });
-      haptic('success');
-      toast('Имя сохранено', 'success');
+      const data = await api('/auth/name', { method: 'POST', body: { name: name.trim() } });
       onDone(data);
     } catch (err) {
-      setError(err.message || 'Не удалось сохранить имя');
-      haptic('error');
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить имя');
     } finally {
       setBusy(false);
     }
-  };
+  }
 
   return (
-    <div className="onboarding">
-      <div>
-        <div className="brand" style={{ fontSize: 15 }}>
-          FARTU MASTI
-        </div>
-        <h1 className="title" style={{ fontSize: 26, marginTop: 8 }}>
-          Ваше имя за столом
-        </h1>
-        <p className="subtitle">
-          Один раз придумайте уникальное имя — оно будет видно соперникам. Приветственный бонус:{' '}
-          {rub(config?.welcomeBonus ?? 25000)}.
-        </p>
+    <div className="onboarding screen">
+      <div className="onboarding__head">
+        <Logo size="lg" tagline />
       </div>
 
-      <form className="panel col" onSubmit={submit}>
-        <div className="field">
-          <label htmlFor="username">Имя пользователя</label>
-          <input
-            id="username"
-            className="input"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12));
-              setError('');
-            }}
-            placeholder="например, durakpro"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            inputMode="text"
-            maxLength={12}
-          />
-          <div className="row row--between">
-            <span className="hint">Латиница и цифры, 4–12 символов</span>
-            <span className="hint mono">{name.length}/12</span>
-          </div>
-        </div>
-        {error ? <p className="hint hint--error">{error}</p> : null}
-        <button className="btn btn--primary btn--wide" type="submit" disabled={busy || !name}>
-          {busy ? 'Проверяем…' : 'Занять имя'}
-        </button>
-      </form>
+      <div className="panel onboarding__rules">
+        <span className="eyebrow">Первый вход</span>
+        <h1 className="h1 onboarding__title">Придумайте игровое имя</h1>
+        <p className="muted small">
+          Оно будет видно соперникам за столом. Позже имя можно изменить за 49 ₽.
+        </p>
 
-      <ul className="rules">
-        {RULES.map((rule) => (
-          <li key={rule}>{rule}</li>
-        ))}
-      </ul>
+        <form onSubmit={submit} className="col" style={{ gap: 14, marginTop: 18 }}>
+          <label className="field">
+            <span className="field__label">Имя игрока</span>
+            <input
+              className="input input--name"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12));
+                setError('');
+              }}
+              placeholder="Archi"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              maxLength={12}
+            />
+          </label>
+
+          <div className="name-status">
+            <span className={`rule ${hint ? 'rule--bad' : name ? 'rule--ok' : ''}`}>
+              <i className="rule__dot" aria-hidden="true" />4–12 символов
+            </span>
+            <span className={`rule ${hint ? 'rule--bad' : name ? 'rule--ok' : ''}`}>
+              <i className="rule__dot" aria-hidden="true" />латиница и цифры
+            </span>
+            <span className={`rule ${hint ? 'rule--bad' : name ? 'rule--ok' : ''}`}>
+              <i className="rule__dot" aria-hidden="true" />минимум 3 буквы
+            </span>
+          </div>
+
+          {error ? <div className="hint hint--error">{error}</div> : null}
+          {!error && hint && name ? <div className="hint">{hint}</div> : null}
+
+          <button type="submit" className="btn btn--primary btn--lg btn--wide" disabled={busy || Boolean(hint)}>
+            {busy ? 'Сохраняем…' : 'Продолжить'}
+          </button>
+        </form>
+      </div>
+
+      <p className="muted small center">
+        Вход выполняется автоматически через Telegram. Пароль и телефон не нужны.
+      </p>
     </div>
   );
 }
+
+export default Onboarding;
