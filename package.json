@@ -1,0 +1,27 @@
+{
+  "name": "fartu-masti",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "test": "node --test tests/",
+    "check": "npm run build && npm test"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sql.js": "^1.13.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.19"
+  }
+}
