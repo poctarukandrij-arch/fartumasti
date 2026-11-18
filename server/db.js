@@ -256,6 +256,9 @@ function toParams(params) {
   });
 }
 
+// Глубина вложенности транзакций: внешняя открывает BEGIN, внутренние выполняются в ней.
+let txDepth = 0;
+
 export const db = {
   run(sql, params = []) {
     const stmt = raw.prepare(sql);
@@ -297,7 +300,18 @@ export const db = {
     schedulePersist();
   },
   tx(fn) {
+    // Вложенный вызов (например, debit внутри покупки) не открывает вторую транзакцию:
+    // он выполняется в уже открытой, а откат делает самый внешний вызов.
+    if (txDepth > 0) {
+      txDepth += 1;
+      try {
+        return fn();
+      } finally {
+        txDepth -= 1;
+      }
+    }
     raw.run('BEGIN');
+    txDepth = 1;
     try {
       const result = fn();
       raw.run('COMMIT');
@@ -310,6 +324,8 @@ export const db = {
         /* игнорируем */
       }
       throw err;
+    } finally {
+      txDepth = 0;
     }
   },
   persist: persistNow,
