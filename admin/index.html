@@ -93,7 +93,7 @@
           method: options.method || 'GET',
           headers: {
             'content-type': 'application/json',
-            authorization: `Bearer ${token}`,
+            'x-admin-token': token,
           },
           body: options.body ? JSON.stringify(options.body) : undefined,
         });
@@ -225,8 +225,8 @@
         refresh();
       };
 
-      window.decide = async (id, status) => {
-        await call(`/api/admin/withdrawals/${id}`, { method: 'POST', body: { status } });
+      window.decide = async (id, decision) => {
+        await call(`/api/admin/withdrawals/${id}`, { method: 'POST', body: { decision } });
         refresh();
       };
 
