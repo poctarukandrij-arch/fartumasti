@@ -1,10 +1,10 @@
 // Менеджер игровых комнат: матчмейкинг, партии, чат, голосовые сигналы,
 // переподключение и восстановление сессий после перезапуска сервера.
 import crypto from 'node:crypto';
-import { createGame, applyAction, publicState, handlePlayerLeft, autoAction, GameError } from './game/durak.js';
-import { db } from './db.js';
-import { checkMessage, sanitizeMessage } from './filter.js';
-import { equippedOf } from './shop.js';
+import { createGame, applyAction, publicState, handlePlayerLeft, autoAction, GameError } from './durak.js';
+import { db } from '../db.js';
+import { checkMessage, sanitizeMessage } from '../filter.js';
+import { equippedOf } from '../shop.js';
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const DISCONNECT_GRACE_MS = 90 * 1000;
