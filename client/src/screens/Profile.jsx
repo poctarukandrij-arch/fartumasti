@@ -1,191 +1,183 @@
 import { useState } from 'react';
 import { api } from '../api.js';
-import { haptic, closeApp } from '../telegram.js';
-import { rub } from '../utils.js';
+import { rub, initials } from '../utils.js';
 
-export default function Profile({ me, refreshMe, onLogout, toast }) {
-  const [modal, setModal] = useState(false);
+const NAME_RE = /^[A-Za-z0-9]{4,12}$/;
+
+export function Profile({ me, stats, onLogout, onWithdraw, refreshMe, toast }) {
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const user = me.user;
-  const price = me.config?.nameChangePrice ?? 4900;
+  const [error, setError] = useState('');
 
-  const toggle = async (field) => {
-    haptic('light');
-    try {
-      const data = await api('/profile/settings', {
-        method: 'POST',
-        body: {
-          soundEnabled: field === 'soundEnabled' ? !user.soundEnabled : Boolean(user.soundEnabled),
-          notificationsEnabled:
-            field === 'notificationsEnabled' ? !user.notificationsEnabled : Boolean(user.notificationsEnabled),
-        },
-      });
-      await refreshMe();
-      toast(
-        field === 'soundEnabled'
-          ? data.user.soundEnabled
-            ? 'Звук включён'
-            : 'Звук выключен'
-          : data.user.notificationsEnabled
-            ? 'Уведомления включены'
-            : 'Уведомления выключены',
-        'success',
-      );
-    } catch (error) {
-      toast(error.message, 'error');
-    }
+  const unlimited = Boolean(me?.unlimited);
+  const telegramId = me?.telegramId ?? me?.telegram_id ?? me?.tgId ?? '—';
+  const settings = {
+    soundEnabled: me?.soundEnabled ?? me?.sound_enabled ?? true,
+    notificationsEnabled: me?.notificationsEnabled ?? me?.notifications_enabled ?? true,
   };
 
-  const changeName = async () => {
+  async function saveName(event) {
+    event.preventDefault();
     const value = name.trim();
-    if (!/^[A-Za-z0-9]{4,12}$/.test(value) || value.replace(/[^A-Za-z]/g, '').length < 3) {
-      toast('Имя: 4–12 символов, минимум 3 английские буквы', 'error');
+    if (!NAME_RE.test(value)) {
+      setError('4–12 символов: латинские буквы и цифры');
+      return;
+    }
+    if ((value.match(/[A-Za-z]/g) || []).length < 3) {
+      setError('Минимум 3 буквы');
       return;
     }
     setBusy(true);
+    setError('');
     try {
       await api('/profile/name', { method: 'POST', body: { name: value } });
-      await refreshMe();
-      setModal(false);
+      await refreshMe?.();
+      setEditing(false);
       setName('');
-      haptic('success');
       toast('Имя изменено', 'success');
-    } catch (error) {
-      toast(error.message, 'error');
+    } catch (err) {
+      setError(err.message);
     } finally {
       setBusy(false);
     }
-  };
+  }
+
+  async function toggle(key) {
+    const next = { ...settings, [key]: !settings[key] };
+    try {
+      await api('/profile/settings', { method: 'POST', body: next });
+      await refreshMe?.();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
 
   return (
     <div className="screen">
-      <section className="panel col">
-        <div className="row" style={{ gap: 14 }}>
-          <div className="avatar">{user.username.slice(0, 2).toUpperCase()}</div>
-          <div className="col" style={{ gap: 2 }}>
-            <div className="strong" style={{ fontSize: 18 }}>
-              {user.username}
-            </div>
-            <div className="hint mono">Telegram ID: {user.telegramId}</div>
-          </div>
+      <section className="profile-hero panel">
+        <span className="monogram" aria-hidden="true">{initials(me?.username)}</span>
+        <div className="profile-hero__meta">
+          <span className="profile-hero__name">
+            {me?.username || 'Игрок'}
+            {unlimited ? <span className="badge badge--unlimited">∞</span> : null}
+          </span>
+          <span className="small muted">Telegram ID: {telegramId}</span>
+          <span className="balance-chip" style={{ marginTop: 8 }}>
+            <span className="balance-chip__coin" aria-hidden="true">₽</span>
+            <span className="num">{unlimited ? '∞' : rub(me?.balance)}</span>
+          </span>
         </div>
-        <div className="row row--between" style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 14 }}>
-          <div>
-            <div className="hint">Баланс</div>
-            <div className="balance">{rub(user.balance)}</div>
+      </section>
+
+      <div className="stat-grid">
+        <div className="stat">
+          <span className="stat__label">Партии</span>
+          <span className="stat__value">{stats?.gamesPlayed ?? 0}</span>
+        </div>
+        <div className="stat">
+          <span className="stat__label">Победы</span>
+          <span className="stat__value stat__value--accent">{stats?.wins ?? 0}</span>
+        </div>
+        <div className="stat">
+          <span className="stat__label">Процент побед</span>
+          <span className="stat__value">{stats?.winRate ?? 0}%</span>
+        </div>
+      </div>
+
+      <section className="section">
+        <div className="section__head">
+          <h3 className="section__title">Профиль</h3>
+        </div>
+        <div className="panel panel--flush">
+          <button type="button" className="list__row" onClick={() => setEditing((prev) => !prev)}>
+            <span className="list__ico" aria-hidden="true">Aa</span>
+            <span className="list__body">
+              <span className="list__title">Имя игрока</span>
+              <span className="list__sub">{me?.username || 'не задано'} · смена 49 ₽</span>
+            </span>
+            <span className="list__value">{editing ? 'закрыть' : 'изменить'}</span>
+          </button>
+
+          {editing ? (
+            <form onSubmit={saveName} className="col" style={{ gap: 10, padding: '4px 14px 16px' }}>
+              <input
+                className="input input--name"
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12));
+                  setError('');
+                }}
+                placeholder="Новое имя"
+                maxLength={12}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {error ? <div className="hint hint--error">{error}</div> : null}
+              <button type="submit" className="btn btn--primary btn--sm" disabled={busy || !name.trim()}>
+                {busy ? 'Сохраняем…' : 'Сменить за 49 ₽'}
+              </button>
+            </form>
+          ) : null}
+
+          <div className="settings-row">
+            <span className="list__body">
+              <span className="settings-row__label">Звуки игры</span>
+              <span className="settings-row__hint">карты, ходы, победа</span>
+            </span>
+            <button
+              type="button"
+              className={`switch ${settings.soundEnabled ? 'switch--on' : ''}`}
+              role="switch"
+              aria-checked={settings.soundEnabled}
+              aria-label="Звуки игры"
+              onClick={() => toggle('soundEnabled')}
+            >
+              <i />
+            </button>
           </div>
-          <button className="btn btn--soft btn--sm" type="button" onClick={() => setModal(true)}>
-            Сменить имя
+
+          <div className="settings-row">
+            <span className="list__body">
+              <span className="settings-row__label">Уведомления</span>
+              <span className="settings-row__hint">приглашения и ходы</span>
+            </span>
+            <button
+              type="button"
+              className={`switch ${settings.notificationsEnabled ? 'switch--on' : ''}`}
+              role="switch"
+              aria-checked={settings.notificationsEnabled}
+              aria-label="Уведомления"
+              onClick={() => toggle('notificationsEnabled')}
+            >
+              <i />
+            </button>
+          </div>
+
+          <button type="button" className="list__row" onClick={onWithdraw}>
+            <span className="list__ico" aria-hidden="true">₽</span>
+            <span className="list__body">
+              <span className="list__title">Вывод средств</span>
+              <span className="list__sub">виртуальный баланс · раздел готовится</span>
+            </span>
+            <span className="chip chip--soon">Скоро</span>
+          </button>
+
+          <button type="button" className="list__row" onClick={onLogout}>
+            <span className="list__ico" aria-hidden="true">⎋</span>
+            <span className="list__body">
+              <span className="list__title">Выйти</span>
+              <span className="list__sub">сессия закроется, прогресс сохранится</span>
+            </span>
           </button>
         </div>
       </section>
 
-      <section className="section">
-        <div className="section__head">
-          <h2 className="section__title">Статистика</h2>
-        </div>
-        <div className="panel grid-2" style={{ gap: 10 }}>
-          <div>
-            <div className="hint">Партии</div>
-            <div className="strong">{me.stats.gamesPlayed}</div>
-          </div>
-          <div>
-            <div className="hint">Победы</div>
-            <div className="strong">{me.stats.wins}</div>
-          </div>
-          <div>
-            <div className="hint">Поражения</div>
-            <div className="strong">{me.stats.losses}</div>
-          </div>
-          <div>
-            <div className="hint">Процент побед</div>
-            <div className="strong">{me.stats.winRate}%</div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="section__head">
-          <h2 className="section__title">Настройки</h2>
-        </div>
-        <div className="panel col" style={{ gap: 0 }}>
-          <div className="row row--between setting">
-            <div>
-              <div>Звук</div>
-              <div className="hint">Сигналы хода и уведомления</div>
-            </div>
-            <button
-              type="button"
-              className={`switch ${user.soundEnabled ? 'switch--on' : ''}`}
-              onClick={() => toggle('soundEnabled')}
-              aria-pressed={Boolean(user.soundEnabled)}
-            >
-              <span className="switch__knob" />
-            </button>
-          </div>
-          <div className="row row--between setting">
-            <div>
-              <div>Уведомления</div>
-              <div className="hint">Напоминания о ходе в партии</div>
-            </div>
-            <button
-              type="button"
-              className={`switch ${user.notificationsEnabled ? 'switch--on' : ''}`}
-              onClick={() => toggle('notificationsEnabled')}
-              aria-pressed={Boolean(user.notificationsEnabled)}
-            >
-              <span className="switch__knob" />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="section__head">
-          <h2 className="section__title">Платежи</h2>
-        </div>
-        <div className="panel col">
-          <p className="hint" style={{ margin: 0 }}>
-            {me.config?.payments?.depositsEnabled
-              ? 'Пополнение доступно через платёжный провайдер.'
-              : 'Приём платежей не подключён: нужны ключи платёжного провайдера. Покупки в магазине идут с баланса.'}
-          </p>
-          <div className="row" style={{ gap: 8 }}>
-            <span className="pill">{me.config?.payments?.providerLabel || 'Провайдер не настроен'}</span>
-            <span className="pill">мин. {rub(me.config?.payments?.depositMin ?? 10000)}</span>
-          </div>
-        </div>
-      </section>
-
-      <button className="btn btn--ghost btn--wide" type="button" onClick={onLogout}>
-        Выйти из приложения
-      </button>
-      <button className="btn btn--ghost btn--wide btn--sm" type="button" onClick={() => closeApp()}>
-        Закрыть приложение
-      </button>
-
-      {modal ? (
-        <div className="sheet-backdrop" onClick={() => setModal(false)}>
-          <div className="sheet" onClick={(event) => event.stopPropagation()}>
-            <div className="sheet__grab" />
-            <h3 className="sheet__title">Новое имя</h3>
-            <p className="hint">Стоимость смены — {rub(price)}. Средства списываются с баланса.</p>
-            <input
-              className="input"
-              value={name}
-              onChange={(event) => setName(event.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12))}
-              placeholder={user.username}
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-            <button className="btn btn--primary btn--wide" type="button" onClick={changeName} disabled={busy}>
-              {busy ? 'Сохраняем…' : `Сменить за ${rub(price)}`}
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <p className="muted small center">
+        Баланс виртуальный и не является денежными средствами. Реальные выплаты не подключены.
+      </p>
     </div>
   );
 }
+
+export default Profile;
