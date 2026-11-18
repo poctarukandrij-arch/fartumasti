@@ -3,14 +3,16 @@ import crypto from 'node:crypto';
 import { db } from './db.js';
 
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAX_AUTH_AGE_SEC = 24 * 60 * 60;
+const MAX_AUTH_AGE_SEC = Number(process.env.AUTH_MAX_AGE_SEC || 24 * 60 * 60);
+const CLOCK_SKEW_SEC = 300;
 const RESERVED_NAMES = new Set([
   'admin', 'administrator', 'support', 'moder', 'moderator', 'root', 'system',
   'fartu', 'masti', 'fartumasti', 'durak', 'bot', 'telegram', 'official',
 ]);
 
 export function botToken() {
-  return process.env.TELEGRAM_BOT_TOKEN || '';
+  // Токен из настроек может прийти с переводом строки — тогда HMAC не совпадёт.
+  return String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 }
 
 export function botConfigured() {
@@ -26,53 +28,67 @@ export function devLoginEnabled() {
  * secret = HMAC_SHA256("WebAppData", botToken); hash = HMAC_SHA256(secret, data_check_string)
  */
 export function verifyInitData(initData, token = botToken()) {
-  if (!initData || typeof initData !== 'string') {
-    return { ok: false, error: 'Отсутствуют данные Telegram' };
+  if (!initData || typeof initData !== 'string' || !initData.trim()) {
+    return { ok: false, code: 'AUTH_NO_DATA', error: 'Отсутствуют данные Telegram' };
   }
   if (!token) {
-    return { ok: false, error: 'Сервер не настроен: не задан токен бота' };
+    return { ok: false, code: 'AUTH_NOT_CONFIGURED', error: 'Сервер не настроен: не задан токен бота' };
   }
   let params;
   try {
-    params = new URLSearchParams(initData);
+    params = new URLSearchParams(initData.trim().replace(/^[?#]+/, ''));
   } catch {
-    return { ok: false, error: 'Некорректные данные Telegram' };
+    return { ok: false, code: 'AUTH_BAD_FORMAT', error: 'Некорректные данные Telegram' };
   }
   const hash = params.get('hash');
   if (!hash || !/^[0-9a-f]{64}$/i.test(hash)) {
-    return { ok: false, error: 'Отсутствует подпись Telegram' };
+    return { ok: false, code: 'AUTH_NO_SIGNATURE', error: 'Отсутствует подпись Telegram' };
   }
-  params.delete('hash');
-  params.delete('signature');
-  const dataCheckString = [...params.entries()]
-    .map(([k, v]) => [k, v])
+
+  // Telegram добавляет поле signature (Ed25519). Официальная HMAC-проверка исключает
+  // его из data-check-string, но часть клиентов считает иначе — принимаем оба варианта.
+  // Оба требуют знания токена бота, поэтому защита не ослабляется.
+  const signed = new URLSearchParams(params);
+  signed.delete('hash');
+  const withSignature = [...signed.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n');
+  const unsigned = new URLSearchParams(signed);
+  unsigned.delete('signature');
+  const withoutSignature = [...unsigned.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
     .map(([k, v]) => `${k}=${v}`)
     .join('\n');
 
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(token).digest();
-  const computed = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-
-  const a = Buffer.from(computed, 'hex');
-  const b = Buffer.from(hash, 'hex');
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return { ok: false, error: 'Подпись Telegram неверна' };
+  const expected = Buffer.from(hash, 'hex');
+  const signatureOk = [withoutSignature, withSignature].some((dataCheckString) => {
+    const computed = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest();
+    return computed.length === expected.length && crypto.timingSafeEqual(computed, expected);
+  });
+  if (!signatureOk) {
+    return { ok: false, code: 'AUTH_BAD_SIGNATURE', error: 'Подпись Telegram неверна' };
   }
 
-  const authDate = Number(params.get('auth_date') || 0);
-  if (!authDate) return { ok: false, error: 'Нет времени авторизации Telegram' };
-  if (Math.abs(Date.now() / 1000 - authDate) > MAX_AUTH_AGE_SEC) {
-    return { ok: false, error: 'Данные Telegram устарели, откройте приложение заново' };
+  const authDate = Number(unsigned.get('auth_date') || 0);
+  if (!authDate) return { ok: false, code: 'AUTH_NO_DATE', error: 'Нет времени авторизации Telegram' };
+  const ageSec = Date.now() / 1000 - authDate;
+  if (ageSec > MAX_AUTH_AGE_SEC + CLOCK_SKEW_SEC) {
+    return { ok: false, code: 'AUTH_EXPIRED', error: 'Данные Telegram устарели, откройте приложение заново' };
+  }
+  if (ageSec < -CLOCK_SKEW_SEC) {
+    return { ok: false, code: 'AUTH_CLOCK', error: 'Неверное время на устройстве — проверьте часы' };
   }
 
   let tgUser = null;
   try {
-    tgUser = JSON.parse(params.get('user') || 'null');
+    tgUser = JSON.parse(unsigned.get('user') || 'null');
   } catch {
-    return { ok: false, error: 'Некорректные данные пользователя Telegram' };
+    return { ok: false, code: 'AUTH_BAD_USER', error: 'Некорректные данные пользователя Telegram' };
   }
   if (!tgUser || !tgUser.id) {
-    return { ok: false, error: 'Нет пользователя Telegram' };
+    return { ok: false, code: 'AUTH_NO_USER', error: 'Нет пользователя Telegram' };
   }
   return {
     ok: true,

@@ -46,6 +46,19 @@ function fail(res, status, error, message) {
   return res.status(status).json({ error, message });
 }
 
+/** initData приходит в теле запроса или в заголовке (заголовок — URL-encoded). */
+function readInitData(req) {
+  const fromBody = req.body && typeof req.body.initData === 'string' ? req.body.initData : '';
+  if (fromBody) return fromBody;
+  const header = req.get('x-telegram-init-data');
+  if (!header) return '';
+  try {
+    return decodeURIComponent(header);
+  } catch {
+    return header;
+  }
+}
+
 function mapError(res, error) {
   if (error instanceof WalletError) {
     const status = error.code === 'INSUFFICIENT_FUNDS' ? 402 : 400;
@@ -207,7 +220,8 @@ export async function buildServer() {
 
   app.post('/api/auth/telegram', async (req, res) => {
     try {
-      const { initData, devUserId, devName } = req.body || {};
+      const { devUserId, devName } = req.body || {};
+      const initData = readInitData(req);
       let telegram;
       if (devLoginEnabled() && !initData && devUserId) {
         telegram = {
@@ -217,7 +231,11 @@ export async function buildServer() {
         };
       } else {
         const check = verifyInitData(initData);
-        if (!check.ok) return fail(res, 401, 'AUTH_FAILED', check.error);
+        if (!check.ok) {
+          // Только код причины: initData, подпись и данные пользователя в логи не попадают.
+          console.warn('[auth] initData отклонён:', check.code, 'present:', Boolean(initData));
+          return fail(res, 401, check.code, check.error);
+        }
         telegram = check;
       }
 
