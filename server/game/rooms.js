@@ -1,7 +1,7 @@
 // Менеджер игровых комнат: матчмейкинг, партии, чат, голосовые сигналы,
 // переподключение и восстановление сессий после перезапуска сервера.
 import crypto from 'node:crypto';
-import { createGame, applyAction, publicState, handlePlayerLeft, autoAction, GameError } from './durak.js';
+import { createGame, applyAction, publicState, handlePlayerLeft, autoAction, GameError, normalizeDeckSize } from './durak.js';
 import { db } from '../db.js';
 import { checkMessage, sanitizeMessage } from '../filter.js';
 import { equippedOf } from '../shop.js';
@@ -318,7 +318,7 @@ export function createRoomManager({
     const gameMode = mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy';
     // Взнос — целые копейки (не больше 1 000 000 ₽), колода — только 36 или 52 карты.
     const stake = Math.min(Math.max(Math.trunc(Number(buyIn) || 0), 0), 100_000_000);
-    const cards = Number(deckSize) === 52 ? 52 : 36;
+    const cards = normalizeDeckSize(deckSize);
     const code = roomCode();
     const room = {
       id: `room_${crypto.randomUUID()}`,
