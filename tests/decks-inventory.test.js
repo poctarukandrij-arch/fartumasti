@@ -80,7 +80,6 @@ test('партия на 24 картах раздаётся только из м�
     { mode: 'podkidnoy', deckSize: 24 },
   );
   const all = [...state.players.flatMap((player) => player.hand), ...state.deck];
-  if (state.trumpCard) all.push(state.trumpCard);
   assert.equal(all.length, 24);
   assert.ok(all.every((card) => ['9', '10', 'J', 'Q', 'K', 'A'].includes(card.rank)));
   assert.ok(state.players.every((player) => player.hand.length === 6));
@@ -94,7 +93,6 @@ test('партия на 52 картах отдаёт игрокам выбран
     { mode: 'podkidnoy', deckSize: 52 },
   );
   const all = [...state.players.flatMap((player) => player.hand), ...state.deck];
-  if (state.trumpCard) all.push(state.trumpCard);
   assert.equal(all.length, 52);
   assert.equal(new Set(all.map((card) => card.id)).size, 52);
   assert.ok(state.players.every((player) => player.hand.length === 6));
@@ -107,7 +105,6 @@ test('партия на 36 картах остаётся классическо�
     { mode: 'podkidnoy', deckSize: 36 },
   );
   const all = [...state.players.flatMap((player) => player.hand), ...state.deck];
-  if (state.trumpCard) all.push(state.trumpCard);
   assert.equal(all.length, 36);
   assert.ok(all.every((card) => !['2', '3', '4', '5'].includes(card.rank)));
 });
