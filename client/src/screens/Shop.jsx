@@ -118,8 +118,10 @@ export function Shop({ me, toast, refreshMe }) {
     setOpening({ box, phase: 'chest', data: null, item: null });
 
     // Медленная фаза «зарядки» сундука — 1.5 с, затем раскрытие.
+    // Переводим в «spin» только пока сундук ещё заряжается: иначе таймер
+    // может сработать уже после ответа сервера и откатить показ награды.
     const toOpen = setTimeout(
-      () => setOpening((prev) => (prev ? { ...prev, phase: 'spin' } : prev)),
+      () => setOpening((prev) => (prev && prev.phase === 'chest' ? { ...prev, phase: 'spin' } : prev)),
       1500,
     );
 
@@ -141,6 +143,7 @@ export function Shop({ me, toast, refreshMe }) {
       refreshMe?.();
       // Даём раскрытию доиграть, чтобы награда появилась после эффекта.
       await new Promise((resolve) => setTimeout(resolve, 1200));
+      clearTimeout(toOpen);
       setOpening((prev) =>
         prev ? { ...prev, data, item: data.item || found || null, phase: 'result' } : prev,
       );
