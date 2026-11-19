@@ -397,3 +397,431 @@ body,
 .fm-rates__art .fm-bankcard {
   filter: drop-shadow(0 4px 8px rgba(3, 0, 10, 0.5));
 }
+
+/* ============================================================================
+   7. ЕДИНАЯ ПОЛНОЭКРАННАЯ СЕТКА
+   Общие правила вместо точечных заплаток: ширина = вьюпорт, переносы разрешены
+   только там, где это не ломает композицию, ни один элемент не выходит за экран.
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app,
+.app__main,
+.screen,
+.fm-screen,
+.v3-screen {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.app__main {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+}
+
+.app__main--room {
+  padding-left: max(6px, env(safe-area-inset-left, 0px));
+  padding-right: max(6px, env(safe-area-inset-right, 0px));
+}
+
+/* Модалки, шторки и сцена кейса занимают всю ширину экрана */
+.cs-sheet,
+.fm-modal,
+.fm-scene {
+  width: 100%;
+  max-width: 100%;
+}
+
+.cs-sheet__panel,
+.fm-modal__sheet {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+}
+
+/* ── 8. Эмблема героя: крупнее, с воздухом вокруг ───────────────────────── */
+
+.fm-emblem {
+  width: 136px;
+  margin: 0;
+}
+
+.fm-emblem__glow {
+  width: 210px;
+  height: 210px;
+  margin-top: -105px;
+  right: -26px;
+}
+
+.v3-hero {
+  gap: 10px;
+  align-items: center;
+}
+
+.v3-hero__text {
+  min-width: 0;
+}
+
+@media (min-width: 400px) {
+  .fm-emblem {
+    width: 150px;
+  }
+}
+
+@media (max-width: 359px) {
+  .fm-emblem {
+    width: 104px;
+  }
+  .fm-emblem__glow {
+    width: 156px;
+    height: 156px;
+    margin-top: -78px;
+    right: -16px;
+  }
+}
+
+/* ── 9. Кнопки без декоративных теней ───────────────────────────────────── */
+
+button,
+[role='button'],
+.btn,
+.v2-btn,
+.v2-cta,
+.v2-tab,
+.v2-seg__btn,
+.v3-cat,
+.v3-case__rates,
+.v3-case__buy,
+.fm-cta,
+.fm-chip,
+.fm-segment__btn,
+.fm-iconbtn,
+.fm-item__btn,
+.fm-row__action,
+.fm-nav,
+.fm-nav__item,
+.fm-switch,
+.balance-chip,
+.balance-chip__plus,
+.segmented__btn,
+.tabs__btn,
+.nav__item {
+  box-shadow: none !important;
+  filter: none;
+}
+
+/* Нижняя навигация остаётся читаемой за счёт границы, а не тени */
+.fm-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+button:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid rgba(150, 110, 255, 0.85);
+  outline-offset: 2px;
+}
+
+/* ── 10. Никаких выходов за границы экрана ──────────────────────────────── */
+
+button,
+.btn,
+.v2-btn,
+.fm-cta,
+.v3-case__rates,
+.fm-chip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.fm-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  overflow: visible;
+}
+
+.fm-chips .fm-chip {
+  width: 100%;
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.fm-wallet-hero {
+  width: 100%;
+  min-width: 0;
+}
+
+.fm-wallet-hero__body,
+.fm-wallet-hero__text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.fm-wallet-hero__amount,
+.fm-wallet-hero strong {
+  font-size: clamp(26px, 8vw, 34px);
+  white-space: nowrap;
+}
+
+.fm-cta {
+  width: 100%;
+}
+
+.fm-row,
+.fm-row__value,
+.fm-row__action {
+  min-width: 0;
+}
+
+.balance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.balance-chip__plus {
+  flex: 0 0 auto;
+}
+
+.v2-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.v2-title > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-title > .v2-chip,
+.v2-title > .balance-chip {
+  flex: 0 0 auto;
+}
+
+.v2-item__foot {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.v2-item__price {
+  white-space: nowrap;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.field,
+.input,
+input[type='text'],
+input[type='number'] {
+  max-width: 100%;
+}
+
+@media (max-width: 359px) {
+  .fm-chips .fm-chip {
+    font-size: 11px;
+  }
+}
+
+/* ── 11. Кейсы: одна колонка на телефоне, витрина банковских карт ───────── */
+
+.v3-case-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+@media (min-width: 431px) {
+  .v3-case-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.fm-bankcase {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  background: linear-gradient(160deg, rgba(38, 18, 74, 0.94), rgba(12, 5, 26, 0.95));
+  overflow: hidden;
+}
+
+.fm-bankcase__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fm-bankcase__art {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.fm-bankcase__art svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.fm-bankcase__intro {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fm-bankcase__title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.fm-bankcase__desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.78;
+  overflow-wrap: anywhere;
+}
+
+.fm-bankcase__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  min-width: 0;
+}
+
+.fm-bankcase__price {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.fm-bankcase__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.fm-bankcase__group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fm-bankcase__group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+
+.fm-bankcase__group-title {
+  margin: 0;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fm-bankcase__group-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.fm-bankcase__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.fm-bankcase__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 6px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fm-bankcase__card {
+  display: block;
+  width: 100%;
+  line-height: 0;
+}
+
+.fm-bankcase__card svg {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.fm-bankcase__name {
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.fm-bankcase__rate {
+  font-size: 11px;
+  font-weight: 800;
+  opacity: 0.75;
+}
