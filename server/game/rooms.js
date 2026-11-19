@@ -5,6 +5,7 @@ import { createGame, applyAction, publicState, handlePlayerLeft, autoAction, Gam
 import { db } from '../db.js';
 import { checkMessage, sanitizeMessage } from '../filter.js';
 import { equippedOf } from '../shop.js';
+import { credit, debit } from '../wallet.js';
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const DISCONNECT_GRACE_MS = 90 * 1000;
@@ -66,6 +67,9 @@ export function createRoomManager({
       status: room.status,
       maxPlayers: room.maxPlayers,
       mode: room.mode || room.game?.mode || 'podkidnoy',
+      buyIn: room.buyIn || 0,
+      deckSize: room.deckSize || 36,
+      pot: room.pot || 0,
       ownerId: room.ownerId,
       createdAt: room.createdAt,
       players: room.players.map((p) => ({
@@ -104,6 +108,8 @@ export function createRoomManager({
         players: room.players.length,
         maxPlayers: room.maxPlayers,
         mode: room.mode || 'podkidnoy',
+        buyIn: room.buyIn || 0,
+        deckSize: room.deckSize || 36,
         status: room.status,
         ownerName: room.players.find((p) => p.userId === room.ownerId)?.username || '—',
       }));
@@ -233,6 +239,22 @@ export function createRoomManager({
       }
     }
 
+    // Банк стола уходит победителям: равными долями, остаток — первому победителю.
+    if (room.pot > 0 && winners.length) {
+      const share = Math.floor(room.pot / winners.length);
+      winners.forEach((player, index) => {
+        const amount = index === 0 ? room.pot - share * (winners.length - 1) : share;
+        if (amount > 0) {
+          try {
+            credit(player.userId, amount, 'win', 'Выигрыш за столом', { roomId: room.id });
+          } catch (error) {
+            logger.error?.('[rooms] pot payout failed', error);
+          }
+        }
+      });
+      room.pot = 0;
+    }
+
     for (const player of room.players) player.ready = false;
     if (typeof onMatchFinished === 'function') {
       try {
@@ -248,9 +270,37 @@ export function createRoomManager({
 
   function startGame(room) {
     if (room.players.length < 2) throw new RoomError('За столом нужно минимум два игрока', 'NOT_ENOUGH_PLAYERS');
+    // Входной взнос списывается сервером до раздачи. Безлимитные аккаунты
+    // проходят проверку баланса всегда, остальные — только при достаточной сумме.
+    const charged = [];
+    if (room.buyIn > 0) {
+      for (const player of room.players) {
+        try {
+          const tx = debit(player.userId, room.buyIn, 'buyin', `Вход за стол ${room.code || ''}`.trim(), {
+            roomId: room.id,
+          });
+          if (tx.charged) charged.push(player.userId);
+        } catch (error) {
+          for (const userId of charged) {
+            try {
+              credit(userId, room.buyIn, 'refund', 'Возврат взноса за стол');
+            } catch (refundError) {
+              logger.error?.('[rooms] buy-in refund failed', refundError);
+            }
+          }
+          throw new RoomError(
+            error.code === 'INSUFFICIENT_FUNDS'
+              ? 'Недостаточно средств для входа за этот стол'
+              : 'Не удалось списать взнос за стол',
+            error.code === 'INSUFFICIENT_FUNDS' ? 'INSUFFICIENT_FUNDS' : 'BUYIN_FAILED',
+          );
+        }
+      }
+    }
     const infos = room.players.map((p, index) => ({ userId: p.userId, name: p.username, seat: index }));
-    const game = createGame(infos, Math.random, { mode: room.mode || 'podkidnoy' });
+    const game = createGame(infos, Math.random, { mode: room.mode || 'podkidnoy', deckSize: room.deckSize || 36 });
     room.game = game;
+    room.pot = charged.length * room.buyIn;
     room.status = 'playing';
     room.finishedRecorded = false;
     room.result = null;
@@ -262,10 +312,13 @@ export function createRoomManager({
     return room;
   }
 
-  function createRoom(user, { maxPlayers = 2, name = null, mode = 'podkidnoy' } = {}) {
+  function createRoom(user, { maxPlayers = 2, name = null, mode = 'podkidnoy', buyIn = 0, deckSize = 36 } = {}) {
     if (userRoom.has(user.id)) leaveRoom(user.id, { silent: true });
     const size = [2, 3, 4].includes(Number(maxPlayers)) ? Number(maxPlayers) : 2;
     const gameMode = mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy';
+    // Взнос — целые копейки (не больше 1 000 000 ₽), колода — только 36 или 52 карты.
+    const stake = Math.min(Math.max(Math.trunc(Number(buyIn) || 0), 0), 100_000_000);
+    const cards = Number(deckSize) === 52 ? 52 : 36;
     const code = roomCode();
     const room = {
       id: `room_${crypto.randomUUID()}`,
@@ -274,6 +327,9 @@ export function createRoomManager({
       ownerId: user.id,
       maxPlayers: size,
       mode: gameMode,
+      buyIn: stake,
+      deckSize: cards,
+      pot: 0,
       players: [makePlayer(user)],
       chat: [],
       status: 'waiting',
@@ -309,6 +365,12 @@ export function createRoomManager({
     }
     if (room.status !== 'waiting') throw new RoomError('За этим столом уже идёт партия', 'ROOM_PLAYING');
     if (room.players.length >= room.maxPlayers) throw new RoomError('За столом нет свободных мест', 'ROOM_FULL');
+    if (room.buyIn > 0) {
+      const balance = balanceOf(user.id);
+      if (balance < room.buyIn && !isUnlimited(user.id)) {
+        throw new RoomError('Недостаточно средств для входа за этот стол', 'INSUFFICIENT_FUNDS');
+      }
+    }
     if (userRoom.has(user.id)) leaveRoom(user.id, { silent: true });
     room.players.push(makePlayer(user));
     room.lastActivity = Date.now();
