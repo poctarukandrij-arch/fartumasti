@@ -4,6 +4,7 @@ import { rub } from '../utils.js';
 import { Sheet } from '../components/Sheet.jsx';
 import { CaseScene } from '../components/CaseScene.jsx';
 import { BankCardArt, BankCaseArt, bankOf } from '../components/BankCard.jsx';
+import { BankCasePanel } from '../components/BankCase.jsx';
 import { playCaseSpin, playCaseWin } from '../sfx.js';
 import {
   ChestArt,
@@ -163,6 +164,8 @@ export function Shop({ me, toast, refreshMe }) {
     if (opening || busyId) return;
     setBusyId(box.id);
     setOpening({ box, phase: 'charge', strip: [], data: null, item: null });
+    // Звук прокрутки живёт ровно столько, сколько анимация рулетки.
+    let stopSpin = () => {};
 
     try {
       const started = Date.now();
@@ -188,8 +191,13 @@ export function Shop({ me, toast, refreshMe }) {
       const strip = buildStrip(box, data.item?.id);
       setOpening({ box, phase: 'spin', strip, data, item: data.item || null });
 
+      stopSpin = playCaseSpin(SPIN_MS);
       await sleep(SPIN_MS + 300);
-      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));    } catch (error) {
+      stopSpin();
+      playCaseWin();
+      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));
+    } catch (error) {
+      stopSpin();
       setOpening(null);
       toast(error.message, 'error');
     } finally {
@@ -289,7 +297,23 @@ export function Shop({ me, toast, refreshMe }) {
           </p>
 
           <div className="v3-case-grid">
-            {cases.map((box) => (
+            {/* Единственная точка входа в кейс банковских карт — отдельная витрина. */}
+            {(() => {
+              const bankBox = cases.find((box) => box.id === 'case_bankcards');
+              if (!bankBox) return null;
+              return (
+                <BankCasePanel
+                  box={bankBox}
+                  items={catalog?.items || []}
+                  onOpen={openCase}
+                  onRates={setRatesBox}
+                  disabled={Boolean(opening) || Boolean(busyId)}
+                  unlimited={Boolean(catalog?.unlimited)}
+                  balance={Number(catalog?.balance) || 0}
+                />
+              );
+            })()}
+            {cases.filter((box) => box.id !== 'case_bankcards').map((box) => (
               <article key={box.id} className="v3-case">
                 <div className="v3-case__stage">
                   <span className="v3-case__halo" aria-hidden="true" />
@@ -401,7 +425,11 @@ export function Shop({ me, toast, refreshMe }) {
                 isSpin || isResult ? 'is-open' : ''
               }`}
             >
-              <ChestArt theme={opening.box.id} size={isResult ? 168 : 224} open={isSpin || isResult} />
+              {opening.box.id === 'case_bankcards' ? (
+                <BankCaseArt size={isResult ? 168 : 210} />
+              ) : (
+                <ChestArt theme={opening.box.id} size={isResult ? 168 : 224} open={isSpin || isResult} />
+              )}
             </span>
             {isSpin ? (
               <span className="v3-scene__sparks" aria-hidden="true">
