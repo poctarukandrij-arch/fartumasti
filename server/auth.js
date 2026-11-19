@@ -1,6 +1,7 @@
 // Авторизация через Telegram WebApp initData с проверкой подписи на сервере.
 import crypto from 'node:crypto';
 import { db } from './db.js';
+import { isUnlimited } from './wallet.js';
 
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_AUTH_AGE_SEC = Number(process.env.AUTH_MAX_AGE_SEC || 24 * 60 * 60);
@@ -181,6 +182,8 @@ export function publicUser(user) {
     username: user.username,
     telegramId: user.telegram_id,
     balance: user.balance,
+    // Безлимит выдаётся по внутреннему ID аккаунта, а не по отображаемому имени.
+    unlimited: isUnlimited(user.id),
     banned: Boolean(user.banned),
     createdAt: user.created_at,
     soundEnabled: Boolean(user.sound_enabled),
