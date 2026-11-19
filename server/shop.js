@@ -124,6 +124,26 @@ export function isDefaultItem(item) {
   return Boolean(item) && item.price === 0 && DEFAULTS[item.type] === item.id;
 }
 
+// Прозрачные шансы: вес редкости делится между предметами этой редкости,
+// поэтому суммы в интерфейсе совпадают с фактическим выбором в openCase.
+function caseDropRates(box) {
+  const counts = {};
+  for (const id of box.pool) {
+    const item = ITEMS.find((entry) => entry.id === id);
+    if (!item) continue;
+    counts[item.rarity] = (counts[item.rarity] || 0) + 1;
+  }
+  return box.pool
+    .map((id) => {
+      const item = ITEMS.find((entry) => entry.id === id);
+      if (!item) return null;
+      const weight = box.odds[item.rarity] || 0;
+      const count = counts[item.rarity] || 1;
+      return { id, rate: Math.round((weight / count) * 10) / 10 };
+    })
+    .filter(Boolean);
+}
+
 export function shopCatalog() {
   return {
     rarities: RARITIES,

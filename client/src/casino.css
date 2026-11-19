@@ -2383,3 +2383,205 @@ body.no-scroll {
     margin: 0 auto;
   }
 }
+
+/* ==================== Голос стола ==================== */
+.fm-voice {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+  z-index: 70;
+  padding: 14px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(38, 24, 70, 0.98), rgba(11, 9, 24, 0.99));
+  border: 1px solid rgba(168, 132, 255, 0.28);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(18px);
+}
+.fm-voice__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.fm-voice__title {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #cbb9ff;
+}
+.fm-voice__stage { display: flex; align-items: center; gap: 10px; }
+.fm-mic {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+  color: #efeaff;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.fm-mic.is-on {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.08));
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.22);
+}
+.fm-mic__glyph {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(8, 6, 18, 0.55);
+  color: #b9a7ff;
+}
+.fm-mic__glyph svg { width: 18px; height: 18px; }
+.fm-mic.is-on .fm-mic__glyph { color: #6ee7b7; }
+.fm-mic__pulse {
+  position: absolute;
+  inset: -2px;
+  border-radius: 20px;
+  opacity: 0;
+  border: 1px solid rgba(110, 231, 183, 0.6);
+  pointer-events: none;
+}
+.fm-mic.is-on .fm-mic__pulse { animation: fmMicPulse 1.8s ease-out infinite; }
+@keyframes fmMicPulse {
+  0% { opacity: 0.55; transform: scale(0.98); }
+  100% { opacity: 0; transform: scale(1.06); }
+}
+.fm-mic__label { line-height: 1.15; text-align: left; }
+.fm-voice__mute {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f2ecff;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.fm-voice__mute.is-on {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.16);
+  color: #ffd9d9;
+}
+.fm-voice__note { margin: 10px 2px 0; font-size: 11.5px; color: #a99fc9; }
+.fm-voice__empty { margin: 8px 2px 0; font-size: 11.5px; color: #8f86ad; }
+.fm-voice__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ==================== Поддержка ==================== */
+.fm-support { display: grid; gap: 14px; }
+.fm-support__hero {
+  position: relative;
+  overflow: hidden;
+  padding: 22px 18px;
+  border-radius: 26px;
+  background: radial-gradient(120% 120% at 15% 0%, rgba(124, 58, 237, 0.55), rgba(12, 10, 26, 0.96) 62%);
+  border: 1px solid rgba(168, 132, 255, 0.3);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+.fm-support__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(8, 6, 18, 0.55);
+  border: 1px solid rgba(168, 132, 255, 0.35);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cbb9ff;
+}
+.fm-support__title { margin: 12px 0 6px; font-size: 21px; line-height: 1.15; color: #fff; }
+.fm-support__text { margin: 0; font-size: 12.5px; line-height: 1.5; color: #c6bce0; }
+.fm-support__actions { display: grid; gap: 10px; }
+.fm-faq {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+.fm-faq__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  background: transparent;
+  border: 0;
+  color: #f4efff;
+  text-align: left;
+}
+.fm-faq__sign {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.32);
+  color: #d9c9ff;
+  font-weight: 800;
+  font-size: 12px;
+}
+.fm-faq__title { flex: 1; font-size: 12.5px; font-weight: 700; }
+.fm-faq__sub { font-size: 10.5px; color: #a99fc9; }
+.fm-faq__body { padding: 0 14px 14px 46px; }
+.fm-faq__text { margin: 0; font-size: 12px; line-height: 1.55; color: #c6bce0; }
+
+/* ==================== Шансы кейса ==================== */
+.fm-rates { display: grid; gap: 8px; }
+.fm-rates__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.fm-rates__art {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(8, 6, 18, 0.5);
+}
+.fm-rates__body { flex: 1; display: grid; gap: 3px; min-width: 0; }
+.fm-rates__name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f4efff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fm-rates__tag { justify-self: start; }
+.fm-rates__value { font-size: 14px; font-weight: 800; color: #a5f3fc; }
+.v3-case__rates {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(168, 132, 255, 0.4);
+  background: rgba(124, 58, 237, 0.18);
+  color: #dcd0ff;
+  font-size: 11.5px;
+  font-weight: 700;
+}

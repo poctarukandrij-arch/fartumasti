@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { rub } from '../utils.js';
+import { Sheet } from '../components/Sheet.jsx';
+import { playCaseSpin, playCaseWin } from '../sfx.js';
 import {
   ChestArt,
   DeckArt,
@@ -74,6 +76,7 @@ export function Shop({ me, toast, refreshMe }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [opening, setOpening] = useState(null);
+  const [ratesBox, setRatesBox] = useState(null);
   const [offset, setOffset] = useState(0);
   const viewportRef = useRef(null);
 
@@ -183,8 +186,7 @@ export function Shop({ me, toast, refreshMe }) {
       setOpening({ box, phase: 'spin', strip, data, item: data.item || null });
 
       await sleep(SPIN_MS + 300);
-      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));
-    } catch (error) {
+      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));    } catch (error) {
       setOpening(null);
       toast(error.message, 'error');
     } finally {
@@ -313,6 +315,13 @@ export function Shop({ me, toast, refreshMe }) {
                 </div>
                 <div className="v3-case__foot">
                   <span className="v3-case__price">{rub(box.price)}</span>
+                  <button
+                    type="button"
+                    className="v3-case__rates"
+                    onClick={() => setRatesBox(box)}
+                  >
+                    Шансы
+                  </button>
                   <button
                     type="button"
                     className="v2-btn v2-btn--primary"
@@ -446,8 +455,33 @@ export function Shop({ me, toast, refreshMe }) {
           )}
         </div>
       ) : null}
-    </div>
-  );
-}
+
+      <Sheet
+        open={Boolean(ratesBox)}
+        onClose={() => setRatesBox(null)}
+        title={ratesBox ? `${ratesBox.name} — шансы` : 'Шансы'}
+        subtitle="Все награды и вероятности выпадения"
+      >
+        <div className="fm-rates">
+          {(ratesBox?.prizes || []).map((prize) => {
+            const row = (ratesBox?.dropRates || []).find((entry) => entry.id === prize.id);
+            return (
+              <div key={prize.id} className="fm-rates__row">
+                <span className="fm-rates__art" aria-hidden="true">{itemArt(prize, 30)}</span>
+                <span className="fm-rates__body">
+                  <span className="fm-rates__name">{prize.name}</span>
+                  <span className={`fm-rates__tag v2-rarity v2-rarity--${prize.rarity}`}>
+                    {RARITY_LABEL[prize.rarity] || 'обычный'}
+                  </span>
+                </span>
+                <span className="fm-rates__value num">{row ? `${row.rate}%` : '—'}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="fm-fineprint">
+          Вероятности заданы на сервере и не зависят от анимации. Награду всегда определяет сервер.
+        </p>
+      </Sheet>
 
 export default Shop;
