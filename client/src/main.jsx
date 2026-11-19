@@ -7,6 +7,7 @@ import './premium.css';
 import './design.css';
 import './shop.css';
 import './v3.css';
+import './casino.css';
 
 const container = document.getElementById('root');
 createRoot(container).render(
