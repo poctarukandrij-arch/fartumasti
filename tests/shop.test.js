@@ -134,3 +134,50 @@ test('сервер не даёт увести баланс в минус на л
   assert.throws(() => shop.buyItem(user, 'emoji_fire'), (error) => error.code === 'INSUFFICIENT_FUNDS');
   assert.equal(wallet.balanceOf(user), 100);
 });
+
+// ── Кейс «Банковские карты» ────────────────────────────────────────────────
+const bankCase = shop.getCase('case_bankcards');
+const BANK_TIERS = {
+  legendary: ['bank_sber', 'bank_tbank', 'bank_alfa'],
+  rare: ['bank_ozon', 'bank_uralsib', 'bank_wb', 'bank_raif'],
+  common: ['bank_otp', 'bank_sovcom', 'bank_mts'],
+};
+
+test('кейс банковских карт: десять карт в трёх уровнях редкости', () => {
+  assert.ok(bankCase, 'кейс существует');
+  assert.equal(bankCase.pool.length, 10, 'в кейсе ровно десять карт');
+  for (const [rarity, ids] of Object.entries(BANK_TIERS)) {
+    for (const id of ids) {
+      const item = shop.getItem(id);
+      assert.ok(item, `карта ${id} есть в каталоге`);
+      assert.equal(item.rarity, rarity, `${id}: редкость ${rarity}`);
+      assert.ok(item.name && item.name.length > 1, `${id}: есть название`);
+      assert.ok(bankCase.pool.includes(id), `${id} входит в пул кейса`);
+    }
+  }
+  const weights = Object.values(bankCase.odds).reduce((sum, value) => sum + value, 0);
+  assert.equal(weights, 100, 'веса редкостей дают 100%');
+});
+
+test('шансы кейса банковских карт прозрачны и легендарные реже обычных', () => {
+  const catalog = shop.shopCatalog().cases.find((box) => box.id === 'case_bankcards');
+  assert.ok(catalog, 'кейс отдаётся в каталоге магазина');
+  const total = catalog.dropRates.reduce((sum, entry) => sum + entry.rate, 0);
+  assert.ok(Math.abs(total - 100) < 0.6, `сумма шансов близка к 100, получено ${total}`);
+  const rate = (id) => catalog.dropRates.find((entry) => entry.id === id).rate;
+  for (const id of BANK_TIERS.legendary) {
+    assert.ok(rate(id) > 0, `${id}: шанс больше нуля`);
+    assert.ok(rate(id) < rate('bank_otp'), `${id} выпадает реже обычной карты`);
+  }
+});
+
+test('открытие кейса банковских карт выдаёт карту из пула и сохраняет владение', () => {
+  const user = createUser(bankCase.price * 3);
+  const result = shop.openCase(user, 'case_bankcards', () => 0.5, { requestId: 'bank-open-1' });
+  assert.ok(bankCase.pool.includes(result.item.id), 'награда из пула кейса');
+  assert.equal(shop.ownsItem(user, result.item.id), true, 'карта попала во владение');
+
+  const replay = shop.openCase(user, 'case_bankcards', () => 0.9, { requestId: 'bank-open-1' });
+  assert.equal(replay.replayed, true, 'повтор помечен как replay');
+  assert.equal(replay.item.id, result.item.id, 'повтор не выдаёт вторую карту');
+});
