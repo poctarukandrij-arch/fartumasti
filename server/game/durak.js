@@ -1,12 +1,15 @@
 // Игровой движок «Дурак» (подкидной). Чистая серверная логика без сети и БД:
 // состояние мутируется только через applyAction, клиент не может влиять на карты.
 export const SUITS = ['s', 'h', 'd', 'c'];
+export const FULL_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 export const RANKS = ['6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+export const DECK_SIZES = [36, 52];
 export const SUIT_SYMBOLS = { s: '♠', h: '♥', d: '♦', c: '♣' };
 export const SUIT_NAMES = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
 
-export const RANK_VALUE = RANKS.reduce((acc, rank, index) => {
-  acc[rank] = index + 6;
+// Старшинство едино для колоды 36 и 52 карт: 2 < 3 < ... < 10 < J < Q < K < A.
+export const RANK_VALUE = FULL_RANKS.reduce((acc, rank, index) => {
+  acc[rank] = index + 2;
   return acc;
 }, {});
 
@@ -27,10 +30,16 @@ export function cardId(card) {
   return `${card.suit}${card.rank}`;
 }
 
-export function makeDeck() {
+export function normalizeDeckSize(value) {
+  const size = Number(value);
+  return size === 52 ? 52 : 36;
+}
+
+export function makeDeck(deckSize = 36) {
+  const ranks = normalizeDeckSize(deckSize) === 52 ? FULL_RANKS : RANKS;
   const deck = [];
   for (const suit of SUITS) {
-    for (const rank of RANKS) {
+    for (const rank of ranks) {
       deck.push({ id: `${suit}${rank}`, suit, rank });
     }
   }
@@ -179,7 +188,7 @@ function startBout(state, attackerIndex) {
 export const MODES = { PODKIDNOY: 'podkidnoy', PEREVODNOY: 'perevodnoy' };
 export const MODE_TITLES = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
 
-export function createGame(playerInfos, rng = Math.random, { mode = MODES.PODKIDNOY } = {}) {
+export function createGame(playerInfos, rng = Math.random, { mode = MODES.PODKIDNOY, deckSize = 36 } = {}) {
   if (!Array.isArray(playerInfos) || playerInfos.length < MIN_PLAYERS || playerInfos.length > MAX_PLAYERS) {
     throw new GameError(`За столом должно быть от ${MIN_PLAYERS} до ${MAX_PLAYERS} игроков`, 'BAD_PLAYERS');
   }
@@ -189,7 +198,8 @@ export function createGame(playerInfos, rng = Math.random, { mode = MODES.PODKID
     if (seen.has(info.userId)) throw new GameError('Игроки повторяются', 'BAD_PLAYERS');
     seen.add(info.userId);
   }
-  const deck = shuffle(makeDeck(), rng);
+  const deckCount = normalizeDeckSize(deckSize);
+  const deck = shuffle(makeDeck(deckCount), rng);
   const trumpCard = deck[deck.length - 1];
   const state = {
     players: playerInfos.map((info, seat) => ({
@@ -203,6 +213,7 @@ export function createGame(playerInfos, rng = Math.random, { mode = MODES.PODKID
       finishedAt: null,
     })),
     deck,
+    deckSize: deckCount,
     trumpCard,
     trumpSuit: trumpCard.suit,
     mode: mode === MODES.PEREVODNOY ? MODES.PEREVODNOY : MODES.PODKIDNOY,
