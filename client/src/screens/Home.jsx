@@ -38,6 +38,7 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
   const [mode, setMode] = useState('podkidnoy');
   const [buyin, setBuyin] = useState('500');
   const [deckSize, setDeckSize] = useState(36);
+  const [visibility, setVisibility] = useState('public');
   const [code, setCode] = useState('');
 
   const rooms = lobby?.rooms || [];
@@ -48,6 +49,7 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
   const buyinValue = useMemo(() => Number(String(buyin).replace(/[^\d]/g, '')) || 0, [buyin]);
   const buyinValid = buyinValue >= MIN_BUYN && buyinValue <= MAX_BUYN;
 
+  const visibilityLabel = visibility === 'private' ? 'Приватный стол' : 'Открытый стол';
   const summary = `${players} игрока · ${modeLabel(mode)} · ${deckLabel(deckSize)} · ${rub(buyinValue * 100)}`;
 
   function play() {
@@ -64,9 +66,9 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
       toast?.(`Взнос должен быть от ${MIN_BUYN} до ${MAX_BUYN.toLocaleString('ru-RU')} ₽`, 'error');
       return;
     }
-    send({ type: 'room:create', maxPlayers: players, mode, buyn: buyinValue * 100, deckSize });
+    send({ type: 'room:create', maxPlayers: players, mode, buyn: buyinValue * 100, deckSize, visibility });
     setSheet(null);
-    toast?.('Стол создаётся…');
+    toast?.(visibility === 'private' ? 'Приватный стол создаётся…' : 'Стол создаётся…');
   }
 
   function joinByCode() {
@@ -271,6 +273,26 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
         </div>
 
         <div className="v2-field">
+          <span className="v2-field__label">Доступ</span>
+          <div className="v2-seg">
+            <button
+              type="button"
+              className={`v2-seg__btn ${visibility === 'public' ? 'is-on' : ''}`}
+              onClick={() => setVisibility('public')}
+            >
+              Открытый стол
+            </button>
+            <button
+              type="button"
+              className={`v2-seg__btn ${visibility === 'private' ? 'is-on' : ''}`}
+              onClick={() => setVisibility('private')}
+            >
+              Приватный стол
+            </button>
+          </div>
+        </div>
+
+        <div className="v2-field">
           <span className="v2-field__label">Входной взнос, ₽</span>
           <input
             className="v2-input"
@@ -284,9 +306,13 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
 
         <div className="v2-summary">
           <span className="v2-chip">{summary}</span>
+          <span className="v2-chip">{visibilityLabel}</span>
           {buyinValid ? <span className="v2-chip v2-chip--mint">Банк идёт победителю</span> : null}
           {unlimited ? <span className="v2-chip v2-chip--mint">Безлимит</span> : null}
         </div>
+        {visibility === 'private' ? (
+          <p className="fm-note">Приватный стол не виден в списке. Гости заходят по коду приглашения.</p>
+        ) : null}
         {buyinValid ? null : (
           <p className="fm-note">Минимальный взнос — {MIN_BUYN} ₽.</p>
         )}
@@ -301,15 +327,15 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
         onClose={() => setSheet(null)}
         label="Вход по коду"
         title="Вход по коду"
-        subtitle="Код показан в карточке стола"
+        subtitle="Публичный код стола или код приглашения приватного стола"
       >
         <div className="v2-field">
-          <span className="v2-field__label">Код стола</span>
+          <span className="v2-field__label">Код стола или приглашения</span>
           <input
             className="v2-input"
             value={code}
             onChange={(event) => setCode(event.target.value.toUpperCase())}
-            placeholder="Например A7K2"
+            placeholder="Например A7K2Q9"
             maxLength={8}
             autoCapitalize="characters"
           />
