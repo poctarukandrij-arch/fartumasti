@@ -1,212 +1,274 @@
 import { useState } from 'react';
-import { Logo } from '../components/Logo.jsx';
 import { rub } from '../utils.js';
+import { haptic, openLink } from '../telegram.js';
+import {
+  CardsArt,
+  CoinArt,
+  BoltArt,
+  GiftArt,
+  ChestArt,
+  TrophyArt,
+  Sparkle,
+  MonogramArt,
+} from '../components/Art.jsx';
 
-const MODES = [
-  { id: 'podkidnoy', label: 'Подкидной' },
-  { id: 'perevodnoy', label: 'Переводной' },
-];
+const BOT_LINK = 'https://t.me/Fartumastiibot';
+const MODE_LABEL = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
 
-export function Home({ me, lobby, send, toast, inQueue }) {
-  const [sheet, setSheet] = useState(null);
+export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
+  const [panel, setPanel] = useState(null); // 'create' | 'join' | null
   const [seats, setSeats] = useState(2);
   const [mode, setMode] = useState('podkidnoy');
-  const [code, setCode] = useState('');
+  const [joinId, setJoinId] = useState('');
 
+  const rooms = lobby?.rooms || [];
   const online = lobby?.online ?? 0;
-  const rooms = lobby?.rooms ?? [];
   const activeTables = lobby?.activeTables ?? 0;
+  const queueSize = lobby?.queueSize ?? 0;
   const unlimited = Boolean(me?.unlimited);
 
   function quickMatch() {
+    haptic('light');
     if (inQueue) {
       send({ type: 'queue:leave' });
-      toast('Поиск соперника отменён');
       return;
     }
     send({ type: 'queue:join' });
-    toast('Ищем реального соперника…');
   }
 
   function createRoom() {
+    haptic('medium');
     send({ type: 'room:create', maxPlayers: seats, mode });
-    setSheet(null);
+    setPanel(null);
   }
 
-  function joinByCode(event) {
-    event.preventDefault();
-    const value = code.trim().toUpperCase();
-    if (!value) return;
+  function joinRoom(roomId) {
+    const value = String(roomId || '').trim();
+    if (!value) {
+      toast('Введите код стола', 'error');
+      return;
+    }
+    haptic('light');
     send({ type: 'room:join', roomId: value });
-    setSheet(null);
-    setCode('');
+    setPanel(null);
+    setJoinId('');
+  }
+
+  function invite() {
+    haptic('light');
+    openLink(`https://t.me/share/url?url=${encodeURIComponent(BOT_LINK)}&text=${encodeURIComponent(
+      'FARTU MASTI — играем в дурака',
+    )}`);
   }
 
   return (
     <div className="screen">
-      <section className="hero panel">
-        <div className="hero__top">
-          <Logo size="md" tagline />
-          <span className="chip chip--live">
-            <i className="conn__dot" aria-hidden="true" />
-            {online} онлайн
+      {/* ── Баннер ── */}
+      <section className="fm-hero">
+        <div className="fm-hero__row">
+          <span className="fm-hero__art" aria-hidden="true">
+            <CardsArt size={64} />
           </span>
-        </div>
-
-        <h2 className="hero__title">Дурак с реальными игроками</h2>
-        <p className="hero__sub">
-          Подкидной и переводной. Колода 36 карт, честная раздача на сервере.
-        </p>
-
-        <div className="hero__stats">
-          <div className="hero__stat">
-            <span className="stat__label">Баланс</span>
-            <span className={`stat__value ${unlimited ? 'stat__value--accent' : ''}`}>
-              {unlimited ? '∞' : rub(me?.balance)}
-            </span>
-          </div>
-          <div className="hero__stat">
-            <span className="stat__label">Игроков</span>
-            <span className="stat__value">{online}</span>
-          </div>
-          <div className="hero__stat">
-            <span className="stat__label">Столов</span>
-            <span className="stat__value">{activeTables}</span>
+          <div className="fm-hero__body">
+            <span className="fm-eyebrow">Онлайн-дурак</span>
+            <h1 className="fm-hero__title">FARTU MASTI</h1>
+            <p className="fm-hero__sub">Играйте с реальными людьми — без ботов</p>
           </div>
         </div>
 
-        <div className="hero__actions">
-          <button type="button" className="btn btn--primary btn--lg btn--wide" onClick={quickMatch}>
-            {inQueue ? 'Отменить поиск' : 'Играть'}
-            <span className="btn__sub">
-              {inQueue ? 'ожидание соперника' : 'быстрый поиск соперника'}
-            </span>
-          </button>
+        <div className="fm-hero__stats">
+          <div className="fm-hero__stat">
+            <b>{online}</b>
+            <span>Онлайн</span>
+          </div>
+          <div className="fm-hero__stat">
+            <b>{activeTables}</b>
+            <span>Столов</span>
+          </div>
+          <div className="fm-hero__stat">
+            <b>{queueSize}</b>
+            <span>В поиске</span>
+          </div>
         </div>
       </section>
 
-      <section className="quick-grid">
-        <button type="button" className="quick" onClick={() => setSheet('create')}>
-          <span className="quick__ico" aria-hidden="true">＋</span>
-          <span className="quick__label">Создать комнату</span>
-          <span className="quick__hint">приватный стол</span>
+      {/* ── Играть ── */}
+      <button type="button" className="fm-cta fm-cta--hero" onClick={quickMatch}>
+        {inQueue ? 'Ищем соперников…' : 'Играть'}
+        <span className="fm-cta__tag">{inQueue ? 'выйти' : 'быстрый поиск'}</span>
+      </button>
+
+      {/* ── Быстрые действия ── */}
+      <div className="fm-tiles">
+        <button
+          type="button"
+          className="fm-tile"
+          onClick={() => {
+            haptic('light');
+            setPanel(panel === 'create' ? null : 'create');
+          }}
+        >
+          <span className="fm-tile__ico" aria-hidden="true">
+            <BoltArt size={22} />
+          </span>
+          <span className="fm-tile__label">Создать комнату</span>
+          <span className="fm-tile__hint">свой стол и правила</span>
         </button>
-        <button type="button" className="quick" onClick={() => setSheet('join')}>
-          <span className="quick__ico" aria-hidden="true">#</span>
-          <span className="quick__label">Присоединиться</span>
-          <span className="quick__hint">по коду комнаты</span>
+
+        <button
+          type="button"
+          className="fm-tile"
+          onClick={() => {
+            haptic('light');
+            setPanel(panel === 'join' ? null : 'join');
+          }}
+        >
+          <span className="fm-tile__ico" aria-hidden="true">
+            <ChestArt theme="case_table" size={24} />
+          </span>
+          <span className="fm-tile__label">Присоединиться</span>
+          <span className="fm-tile__hint">по коду стола</span>
         </button>
-      </section>
 
-      <section className="section">
-        <div className="section__head">
-          <h3 className="section__title">Доступные столы</h3>
-          <span className="section__hint">{rooms.length ? `${rooms.length} открыто` : 'пока пусто'}</span>
-        </div>
+        <button type="button" className="fm-tile" onClick={invite}>
+          <span className="fm-tile__ico" aria-hidden="true">
+            <GiftArt size={22} />
+          </span>
+          <span className="fm-tile__label">Позвать друзей</span>
+          <span className="fm-tile__hint">ссылка в Telegram</span>
+        </button>
 
-        {rooms.length === 0 ? (
-          <div className="empty">
-            Открытых столов нет. Создайте комнату или нажмите «Играть» — соперник подключится сам.
-          </div>
-        ) : (
-          <div className="table-list">
-            {rooms.map((room) => (
-              <button
-                key={room.id}
-                type="button"
-                className="table-card"
-                onClick={() => send({ type: 'room:join', roomId: room.id })}
-              >
-                <span className="table-card__art" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span className="table-card__body">
-                  <span className="table-card__title">
-                    {room.name}
-                    {room.code ? <span className="chip chip--soon">{room.code}</span> : null}
-                  </span>
-                  <span className="table-card__meta">
-                    {room.mode === 'perevodnoy' ? 'Переводной' : 'Подкидной'} · {room.players}/{room.maxPlayers} ·{' '}
-                    {room.ownerName}
-                  </span>
-                </span>
-                <span className="btn btn--soft btn--sm">Войти</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+        <button type="button" className="fm-tile" onClick={onBalance}>
+          <span className="fm-tile__ico" aria-hidden="true">
+            <CoinArt size={22} />
+          </span>
+          <span className="fm-tile__label">Баланс</span>
+          <span className="fm-tile__hint">{unlimited ? '∞ безлимит' : rub(me?.balance)}</span>
+        </button>
+      </div>
 
-      {sheet ? (
-        <div className="sheet" role="dialog" aria-modal="true" onClick={() => setSheet(null)}>
-          <div className="sheet__panel" onClick={(event) => event.stopPropagation()}>
-            <span className="sheet__grip" aria-hidden="true" />
-            <h3 className="sheet__title">{sheet === 'create' ? 'Новая комната' : 'Вход по коду'}</h3>
-
-            <div className="sheet__body">
-              {sheet === 'create' ? (
-                <>
-                  <span className="field__label">Игроков за столом</span>
-                  <div className="segmented" style={{ marginBottom: 14 }}>
-                    {[2, 3, 4].map((count) => (
-                      <button
-                        key={count}
-                        type="button"
-                        className={`segmented__btn ${seats === count ? 'segmented__btn--active' : ''}`}
-                        onClick={() => setSeats(count)}
-                      >
-                        {count}
-                      </button>
-                    ))}
-                  </div>
-
-                  <span className="field__label">Режим</span>
-                  <div className="segmented" style={{ marginBottom: 18 }}>
-                    {MODES.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`segmented__btn ${mode === item.id ? 'segmented__btn--active' : ''}`}
-                        onClick={() => setMode(item.id)}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button type="button" className="btn btn--primary btn--lg btn--wide" onClick={createRoom}>
-                    Создать комнату
-                  </button>
-                  <p className="muted small center" style={{ marginTop: 10 }}>
-                    Код комнаты появится на столе — отправьте его другу.
-                  </p>
-                </>
-              ) : (
-                <form onSubmit={joinByCode} className="col" style={{ gap: 14 }}>
-                  <label className="field">
-                    <span className="field__label">Код или название комнаты</span>
-                    <input
-                      className="input input--code"
-                      value={code}
-                      onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 12))}
-                      placeholder="Например A7K2Q"
-                      autoComplete="off"
-                      autoCapitalize="characters"
-                      spellCheck={false}
-                    />
-                  </label>
-                  <button type="submit" className="btn btn--primary btn--lg btn--wide" disabled={!code.trim()}>
-                    Присоединиться
-                  </button>
-                  <p className="muted small center">Комнату можно найти и в списке столов выше.</p>
-                </form>
-              )}
+      {/* ── Создание комнаты ── */}
+      {panel === 'create' ? (
+        <section className="fm-panel" style={{ marginTop: 10 }}>
+          <span className="fm-eyebrow">Новый стол</span>
+          <div className="fm-field">
+            <span className="fm-field__label">Игроков за столом</span>
+            <div className="fm-chips">
+              {[2, 3, 4].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`fm-chip ${seats === value ? 'fm-chip--on' : ''}`}
+                  onClick={() => setSeats(value)}
+                >
+                  {value} игрока
+                </button>
+              ))}
             </div>
           </div>
-        </div>
+          <div className="fm-field">
+            <span className="fm-field__label">Режим</span>
+            <div className="fm-segment">
+              {['podkidnoy', 'perevodnoy'].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`fm-segment__btn ${mode === value ? 'fm-segment__btn--on' : ''}`}
+                  onClick={() => setMode(value)}
+                >
+                  {MODE_LABEL[value]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button type="button" className="fm-cta" style={{ marginTop: 12 }} onClick={createRoom}>
+            Создать стол
+          </button>
+        </section>
       ) : null}
+
+      {/* ── Присоединение ── */}
+      {panel === 'join' ? (
+        <section className="fm-panel" style={{ marginTop: 10 }}>
+          <span className="fm-eyebrow">Вход по коду</span>
+          <label className="fm-field">
+            <span className="fm-field__label">Код или ID стола</span>
+            <span className="fm-field__box">
+              <input
+                value={joinId}
+                onChange={(event) => setJoinId(event.target.value.trim().slice(0, 24))}
+                placeholder="Например 4821"
+                inputMode="numeric"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </span>
+          </label>
+          <button
+            type="button"
+            className="fm-cta"
+            style={{ marginTop: 12 }}
+            disabled={!joinId}
+            onClick={() => joinRoom(joinId)}
+          >
+            Войти за стол
+          </button>
+        </section>
+      ) : null}
+
+      {/* ── Столы ── */}
+      <div className="fm-section">
+        <span className="fm-section__title">Доступные столы</span>
+        <span className="fm-section__hint">{rooms.length}</span>
+      </div>
+
+      {rooms.length === 0 ? (
+        <div className="empty">
+          Свободных столов нет. Нажмите «Играть» — подберём соперников, или создайте свой стол.
+        </div>
+      ) : (
+        <div className="fm-list">
+          {rooms.map((room) => (
+            <div key={room.id} className="fm-row">
+              <span className="fm-row__ico" aria-hidden="true">
+                <MonogramArt name={room.ownerName || '?'} size={30} />
+              </span>
+              <span className="fm-row__body">
+                <span className="fm-row__title">{room.name || `Стол ${room.code || room.id}`}</span>
+                <span className="fm-row__sub">
+                  {MODE_LABEL[room.mode] || 'Подкидной'} · {room.players}/{room.maxPlayers} ·{' '}
+                  {room.ownerName || '—'}
+                </span>
+              </span>
+              <button
+                type="button"
+                className="fm-row__action"
+                disabled={room.players >= room.maxPlayers}
+                onClick={() => joinRoom(room.id)}
+              >
+                {room.players >= room.maxPlayers ? 'полон' : 'Войти'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="fm-panel fm-panel--tight" style={{ marginTop: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span aria-hidden="true">
+            <TrophyArt size={26} />
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="fm-row__title" style={{ display: 'block' }}>
+              Только реальные игроки
+            </span>
+            <span className="fm-row__sub" style={{ display: 'block' }}>
+              Ботов нет — соперники живые люди
+            </span>
+          </span>
+          <Sparkle size={14} />
+        </div>
+      </div>
     </div>
   );
 }
