@@ -74,7 +74,7 @@ export const CASES = [
     price: 14900,
     types: ['deck'],
     pool: ['deck_card_steel', 'deck_card_signal', 'deck_card_titan', 'deck_card_black', 'deck_steel', 'deck_neon', 'deck_crimson', 'deck_void'],
-    odds: { common: 40, rare: 34, epic: 20, legendary: 6 },
+    odds: { common: 52, rare: 30, epic: 14, legendary: 4 },
   },
   {
     id: 'case_table',
@@ -83,7 +83,7 @@ export const CASES = [
     price: 12900,
     types: ['table'],
     pool: ['table_emerald', 'table_ocean', 'table_aurora', 'table_lava', 'table_midnight'],
-    odds: { common: 35, rare: 38, epic: 21, legendary: 6 },
+    odds: { common: 46, rare: 34, epic: 16, legendary: 4 },
   },
   {
     id: 'case_emoji',
@@ -92,7 +92,7 @@ export const CASES = [
     price: 9900,
     types: ['emoji'],
     pool: ['emoji_fire', 'emoji_ice', 'emoji_skull', 'emoji_snake', 'emoji_bolt', 'emoji_rocket', 'emoji_diamond'],
-    odds: { common: 30, rare: 40, epic: 22, legendary: 8 },
+    odds: { common: 44, rare: 36, epic: 15, legendary: 5 },
   },
   {
     id: 'case_effect',
@@ -101,7 +101,7 @@ export const CASES = [
     price: 11900,
     types: ['effect'],
     pool: ['effect_ripple', 'effect_glitch', 'effect_lightning', 'effect_phoenix'],
-    odds: { common: 30, rare: 38, epic: 24, legendary: 8 },
+    odds: { common: 40, rare: 38, epic: 16, legendary: 6 },
   },
 ];
 
@@ -128,7 +128,7 @@ export function shopCatalog() {
   return {
     rarities: RARITIES,
     items: ITEMS.map((item) => ({ ...item, isDefault: isDefaultItem(item) })),
-    cases: CASES.map((c) => ({ ...c, odds: c.odds })),
+    cases: CASES.map((c) => ({ ...c, odds: c.odds, dropRates: caseDropRates(c) })),
     nameChangePrice: NAME_CHANGE_PRICE,
   };
 }
