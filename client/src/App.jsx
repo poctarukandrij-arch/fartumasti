@@ -5,6 +5,7 @@ import { GameSocket } from './ws.js';
 import { Voice } from './voice.js';
 import { Toasts } from './components/Toasts.jsx';
 import { TopBar } from './components/TopBar.jsx';
+import { BalanceModal } from './components/BalanceModal.jsx';
 import { Logo } from './components/Logo.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Home from './screens/Home.jsx';
@@ -70,6 +71,7 @@ export default function App() {
   const [inQueue, setInQueue] = useState(false);
   const [connected, setConnected] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [balanceOpen, setBalanceOpen] = useState(false);
   const socketRef = useRef(null);
   const autoRetryRef = useRef(0);
   const voiceRef = useRef(null);
@@ -342,10 +344,16 @@ export default function App() {
     return (
       <div className="app">
         <div className="app__bg" aria-hidden="true" />
-        <TopBar user={me.user} connected={connected} />
+        <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} />
         <main className="app__main">
           <Withdraw me={me.user} onBack={() => setOverlay(null)} />
         </main>
+        <BalanceModal
+          open={balanceOpen}
+          user={me.user}
+          onClose={() => setBalanceOpen(false)}
+          toast={toast}
+        />
         <Toasts items={toasts} />
       </div>
     );
@@ -356,7 +364,9 @@ export default function App() {
   return (
     <div className="app">
       <div className="app__bg" aria-hidden="true" />
-      {!inRoom ? <TopBar user={me.user} connected={connected} /> : null}
+      {!inRoom ? (
+        <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} />
+      ) : null}
 
       <main className={`app__main ${inRoom ? 'app__main--room' : ''}`}>
         {inRoom ? (
@@ -391,12 +401,12 @@ export default function App() {
       </main>
 
       {!inRoom ? (
-        <nav className="nav" aria-label="Основная навигация">
+        <nav className="fm-nav" aria-label="Основная навигация">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`nav__item ${tab === item.id ? 'nav__item--active' : ''}`}
+              className={`fm-nav__item ${tab === item.id ? 'fm-nav__item--on' : ''}`}
               onClick={() => {
                 haptic('light');
                 setTab(item.id);
@@ -408,6 +418,13 @@ export default function App() {
           ))}
         </nav>
       ) : null}
+
+      <BalanceModal
+        open={balanceOpen}
+        user={me.user}
+        onClose={() => setBalanceOpen(false)}
+        toast={toast}
+      />
 
       <Toasts items={toasts} />
     </div>

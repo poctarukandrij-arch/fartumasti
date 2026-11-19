@@ -1652,6 +1652,97 @@ body.no-scroll {
   background: rgba(20, 24, 56, 0.85);
 }
 
+/* ───────────── переключатель и прогресс ───────────── */
+
+.fm-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 27px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--fm-line-strong);
+  background: rgba(10, 12, 30, 0.9);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.fm-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #8f97c6;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.fm-switch--on {
+  border-color: transparent;
+  background: linear-gradient(120deg, #8b5cff, #2e6bff);
+  box-shadow: 0 8px 18px -10px rgba(123, 92, 255, 0.95);
+}
+
+.fm-switch--on i {
+  transform: translateX(19px);
+  background: #fff;
+}
+
+.fm-progress {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(9, 11, 30, 0.9);
+  border: 1px solid var(--fm-line);
+  overflow: hidden;
+}
+
+.fm-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8b5cff, #45e0ff 70%, #3de3b0);
+  box-shadow: 0 0 14px rgba(69, 224, 255, 0.6);
+  transition: width 0.5s ease;
+}
+
+/* ───────────── совместимость со старыми классами ───────────── */
+
+.empty {
+  padding: 22px 16px;
+  border-radius: var(--fm-radius-lg);
+  border: 1px dashed var(--fm-line-strong);
+  background: rgba(16, 19, 46, 0.6);
+  color: var(--fm-faint);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.skeleton {
+  background: linear-gradient(100deg, rgba(30, 35, 78, 0.6), rgba(48, 54, 108, 0.85), rgba(30, 35, 78, 0.6));
+  background-size: 200% 100%;
+  border-radius: var(--fm-radius-md);
+  animation: fm-skel 1.4s linear infinite;
+}
+
+@keyframes fm-skel {
+  from { background-position: 180% 0; }
+  to { background-position: -40% 0; }
+}
+
+.chip--soon,
+.chip {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.hint--error {
+  color: #ff9ec4;
+}
+
 /* ───────────── анимации ───────────── */
 
 @keyframes fm-fade {
