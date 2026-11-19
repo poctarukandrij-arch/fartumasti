@@ -825,3 +825,61 @@ input[type='number'] {
   font-weight: 800;
   opacity: 0.75;
 }
+
+/* ── 12. Подвал карточки кейса: цена, «Шансы» и «Открыть» ─────────────────
+   Кнопка открытия всегда занимает свою строку целиком, поэтому она не может
+   выйти за пределы карточки ни на одном размере экрана. */
+
+.v3-case__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.v3-case__foot .v3-case__price {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.v3-case__foot .v3-case__rates {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding-inline: 10px;
+}
+
+.v3-case__foot .v2-btn {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Полоса категорий прокручивается внутри себя, а не растягивает страницу */
+.v3-catbar {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.v3-catbar::-webkit-scrollbar {
+  display: none;
+}
+
+.v3-case__body,
+.v3-case__title,
+.v3-case__sub {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.v3-case__title {
+  display: block;
+}
