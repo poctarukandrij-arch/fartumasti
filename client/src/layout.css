@@ -74,6 +74,7 @@ body,
 }
 
 .fm-emblem__glow {
+  display: none !important;
   top: 50%;
   right: -18px;
   width: 170px;
@@ -92,8 +93,6 @@ body,
   flex: 0 0 auto;
   display: block;
   width: 112px;
-  animation: fm-emblem-float 7s ease-in-out infinite;
-  filter: drop-shadow(0 12px 26px rgba(124, 58, 237, 0.45));
 }
 
 .fm-emblem svg {
