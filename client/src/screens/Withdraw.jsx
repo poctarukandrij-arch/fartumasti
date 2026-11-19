@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { rub } from '../utils.js';
 
-const METHODS = ['Банковская карта', 'СБП', 'ЮMoney'];
+// Вывод: только СБП — единственный способ в интерфейсе.
+const METHODS = ['СБП'];
 
 // Раздел вывода: полноценный интерфейс будущего функционала, операции отключены.
 export function Withdraw({ me, onBack }) {

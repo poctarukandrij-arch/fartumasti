@@ -398,7 +398,7 @@ export default function App() {
                 me={me.user}
                 stats={me.stats}
                 onLogout={logout}
-                onWithdraw={() => setOverlay('withdraw')}
+                onWithdraw={() => setBalanceOpen(true)}
                 refreshMe={refreshMe}
                 toast={toast}
               />
