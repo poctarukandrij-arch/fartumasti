@@ -3,6 +3,8 @@ import { rub } from '../utils.js';
 
 // Вывод: только СБП — единственный способ в интерфейсе.
 const METHODS = ['СБП'];
+// Минимальная сумма вывода — 500 ₽.
+const MIN_WITHDRAW = 500;
 
 // Раздел вывода: полноценный интерфейс будущего функционала, операции отключены.
 export function Withdraw({ me, onBack }) {
@@ -26,9 +28,13 @@ export function Withdraw({ me, onBack }) {
 
       <div className="panel" style={{ marginTop: 16 }}>
         <span className="field__label">Доступно</span>
-        <div className="display num" style={{ marginBottom: 16 }}>
+        <div className="display num" style={{ marginBottom: 8 }}>
           {me?.unlimited ? '∞' : rub(me?.balance)}
         </div>
+        <p className="fm-min-note" style={{ marginTop: 0 }}>
+          <span>Минимальная сумма вывода</span>
+          <span className="num">{MIN_WITHDRAW.toLocaleString('ru-RU')} ₽</span>
+        </p>
 
         <label className="field">
           <span className="field__label">Сумма вывода</span>
@@ -37,7 +43,7 @@ export function Withdraw({ me, onBack }) {
             inputMode="decimal"
             value={amount}
             onChange={(event) => setAmount(event.target.value.replace(/[^0-9.,]/g, '').slice(0, 12))}
-            placeholder="0"
+            placeholder={String(MIN_WITHDRAW)}
             disabled
             aria-disabled="true"
           />

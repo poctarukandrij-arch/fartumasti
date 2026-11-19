@@ -4,6 +4,10 @@ import { haptic } from '../telegram.js';
 
 const PRESETS = [500, 1000, 2500, 5000];
 
+// Минимальные суммы операций: пополнение — 100 ₽, вывод — 500 ₽.
+const MIN_TOPUP = 100;
+const MIN_WITHDRAW = 500;
+
 function rubles(value) {
   return Math.floor((Number(value) || 0) / 100).toLocaleString('ru-RU');
 }
@@ -33,13 +37,15 @@ export function BalanceModal({ open, user, onClose, toast }) {
   }, [open, onClose]);
 
   const numeric = useMemo(() => Number(String(amount).replace(/[^\d]/g, '')) || 0, [amount]);
+  const minAmount = mode === 'topup' ? MIN_TOPUP : MIN_WITHDRAW;
+  const belowMin = numeric > 0 && numeric < minAmount;
 
   if (!open) return null;
 
   const hint =
     mode === 'topup'
-      ? 'Пополнение виртуальными рублями через СБП станет доступно после подключения платёжного провайдера.'
-      : 'Вывод откроется после согласования юридических требований и подключения СБП. Сейчас раздел работает как предпросмотр.';
+      ? 'Пополнение через СБП станет доступно после подключения платёжного провайдера. Минимум — 100 ₽.'
+      : 'Вывод откроется после согласования юридических требований и подключения СБП. Минимум — 500 ₽.';
 
   return (
     <div className="fm-modal" role="dialog" aria-modal="true" aria-label="Баланс" onClick={onClose}>
@@ -125,6 +131,15 @@ export function BalanceModal({ open, user, onClose, toast }) {
           ))}
         </div>
 
+        <div className={`fm-min-note ${belowMin ? 'fm-min-note--warn' : ''}`}>
+          <span>
+            {belowMin
+              ? `Минимум для этой операции — ${minAmount.toLocaleString('ru-RU')} ₽`
+              : `Минимум ${minAmount.toLocaleString('ru-RU')} ₽ · только СБП`}
+          </span>
+          <span className="num">{numeric > 0 ? `${numeric.toLocaleString('ru-RU')} ₽` : '—'}</span>
+        </div>
+
         <div className="fm-method" aria-label="Способ оплаты">
           <span className="fm-method__logo" aria-hidden="true">
             <SbpMark size={34} />
@@ -145,7 +160,13 @@ export function BalanceModal({ open, user, onClose, toast }) {
         <button
           type="button"
           className="fm-cta fm-cta--muted"
-          onClick={() => toast?.('СБП подключается. Операции станут доступны после запуска провайдера.', 'info')}
+          onClick={() => {
+            if (belowMin) {
+              toast?.(`Минимальная сумма — ${minAmount.toLocaleString('ru-RU')} ₽`, 'error');
+              return;
+            }
+            toast?.('СБП подключается. Операции станут доступны после запуска провайдера.', 'info');
+          }}
         >
           {mode === 'topup' ? 'Пополнить через СБП' : 'Вывести через СБП'}
           <span className="fm-cta__tag">Скоро</span>

@@ -316,8 +316,10 @@ export function createRoomManager({
     if (userRoom.has(user.id)) leaveRoom(user.id, { silent: true });
     const size = [2, 3, 4].includes(Number(maxPlayers)) ? Number(maxPlayers) : 2;
     const gameMode = mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy';
-    // Взнос — целые копейки (не больше 1 000 000 ₽), колода — только 36 или 52 карты.
-    const stake = Math.min(Math.max(Math.trunc(Number(buyIn) || 0), 0), 100_000_000);
+    // Взнос — целые копейки: минимум 200 ₽ (20 000 копеек), максимум 1 000 000 ₽.
+    // Колода — 24, 36 или 52 карты (нормализуется ниже).
+    const rawStake = Math.min(Math.max(Math.trunc(Number(buyIn) || 0), 0), 100_000_000);
+    const stake = rawStake > 0 && rawStake < 20_000 ? 20_000 : rawStake;
     const cards = normalizeDeckSize(deckSize);
     const code = roomCode();
     const room = {

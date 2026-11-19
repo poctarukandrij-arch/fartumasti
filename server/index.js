@@ -825,8 +825,10 @@ export async function buildServer() {
             rooms.createRoom(currentUser, {
               maxPlayers: Number(message.maxPlayers) || 2,
               mode: message.mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy',
-              buyIn: Math.trunc(Number(message.buyIn) || 0),
-              deckSize: Number(message.deckSize) === 52 ? 52 : 36,
+              // Клиент присылает `buyn` (копейки); `buyIn` поддерживаем для совместимости.
+              buyIn: Math.trunc(Number(message.buyn ?? message.buyIn) || 0),
+              // Допустимы все три колоды движка: 24, 36 и 52 карты.
+              deckSize: Number(message.deckSize) || 36,
             });
             break;
           case 'room:join':
