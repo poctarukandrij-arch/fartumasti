@@ -8,7 +8,7 @@ import { suitSymbol } from '../utils.js';
 
 const SUIT_NAME = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
 
-export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe }) {
+export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe, onRules }) {
   const user = me?.user || me || {};
   const myId = user.id;
   const game = room?.game;
@@ -149,6 +149,9 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
       <header className="table-screen__head">
         <button type="button" className="icon-btn" onClick={onLeave} aria-label="Выйти из стола">
           ←
+        </button>
+        <button type="button" className="icon-btn" onClick={onRules} aria-label="Правила игры">
+          ?
         </button>
         <div className="table-screen__title">
           {room.name}

@@ -6,7 +6,7 @@ import { shareInvite } from '../share.js';
 
 const num = (value) => Number(value) || 0;
 
-export function Profile({ me, stats, onLogout, onWithdraw, refreshMe, toast }) {
+export function Profile({ me, stats, onLogout, onWithdraw, onInventory, refreshMe, toast }) {
   const [name, setName] = useState(me?.username || '');
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(me?.soundEnabled !== false);
@@ -123,6 +123,14 @@ export function Profile({ me, stats, onLogout, onWithdraw, refreshMe, toast }) {
           </button>
           <button type="button" className="v2-btn" onClick={invite}>
             Пригласить друга
+          </button>
+        </div>
+        <div className="v2-grid2">
+          <button type="button" className="v2-btn v2-btn--primary" onClick={onInventory}>
+            Инвентарь
+          </button>
+          <button type="button" className="v2-btn" onClick={onInventory}>
+            Мои предметы
           </button>
         </div>
       </section>
