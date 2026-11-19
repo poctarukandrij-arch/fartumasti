@@ -28,6 +28,14 @@ function roomCode() {
   return out;
 }
 
+// Код приглашения для приватных столов: длиннее публичного кода,
+// чтобы подобрать его перебором было нереально.
+function inviteCode() {
+  let out = '';
+  for (let i = 0; i < 6; i += 1) out += ROOM_CODE_ALPHABET[crypto.randomInt(ROOM_CODE_ALPHABET.length)];
+  return out;
+}
+
 function makePlayer(user) {
   return {
     userId: user.id,
@@ -57,12 +65,25 @@ export function createRoomManager({
     return onlineUserIds().length;
   }
 
+  function uniqueInviteCode() {
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const candidate = inviteCode();
+      const taken = [...rooms.values()].some(
+        (room) => String(room.inviteCode || '').toUpperCase() === candidate,
+      );
+      if (!taken) return candidate;
+    }
+    return inviteCode();
+  }
+
   function roomView(room, userId) {
     const game = room.game && !room.game.finished ? publicState(room.game, userId) : null;
     const finishedState = room.game && room.game.finished ? publicState(room.game, userId) : null;
     return {
       id: room.id,
       code: room.code || null,
+      visibility: room.visibility === 'private' ? 'private' : 'public',
+      inviteCode: room.inviteCode || null,
       name: room.name,
       status: room.status,
       maxPlayers: room.maxPlayers,
@@ -98,7 +119,12 @@ export function createRoomManager({
 
   function lobbyPayload() {
     const openRooms = [...rooms.values()]
-      .filter((room) => room.status === 'waiting' && room.players.length < room.maxPlayers)
+      .filter(
+        (room) =>
+          room.visibility !== 'private' &&
+          room.status === 'waiting' &&
+          room.players.length < room.maxPlayers,
+      )
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 30)
       .map((room) => ({
@@ -146,6 +172,12 @@ export function createRoomManager({
         status: room.status,
         game: room.game,
         mode: room.mode || room.game?.mode || 'podkidnoy',
+        buyIn: room.buyIn || 0,
+        deckSize: room.deckSize || 36,
+        pot: room.pot || 0,
+        visibility: room.visibility === 'private' ? 'private' : 'public',
+        inviteCode: room.inviteCode || null,
+        code: room.code || null,
         result: room.result,
         matchId: room.matchId,
         createdAt: room.createdAt,
@@ -312,7 +344,7 @@ export function createRoomManager({
     return room;
   }
 
-  function createRoom(user, { maxPlayers = 2, name = null, mode = 'podkidnoy', buyIn = 0, deckSize = 36 } = {}) {
+  function createRoom(user, { maxPlayers = 2, name = null, mode = 'podkidnoy', buyIn = 0, deckSize = 36, visibility = 'public' } = {}) {
     if (userRoom.has(user.id)) leaveRoom(user.id, { silent: true });
     const size = [2, 3, 4].includes(Number(maxPlayers)) ? Number(maxPlayers) : 2;
     const gameMode = mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy';
@@ -321,10 +353,13 @@ export function createRoomManager({
     const rawStake = Math.min(Math.max(Math.trunc(Number(buyIn) || 0), 0), 100_000_000);
     const stake = rawStake > 0 && rawStake < 20_000 ? 20_000 : rawStake;
     const cards = normalizeDeckSize(deckSize);
+    const isPrivate = visibility === 'private';
     const code = roomCode();
     const room = {
       id: `room_${crypto.randomUUID()}`,
       code,
+      visibility: isPrivate ? 'private' : 'public',
+      inviteCode: isPrivate ? uniqueInviteCode() : null,
       name: name ? String(name).slice(0, 24) : `Стол ${code}`,
       ownerId: user.id,
       maxPlayers: size,
@@ -350,18 +385,29 @@ export function createRoomManager({
     return room;
   }
 
-  function joinRoom(user, roomId) {
-    let room = rooms.get(roomId);
-    if (!room && roomId) {
-      const code = String(roomId).trim().toUpperCase();
+  function joinRoom(user, roomRef, inviteCodeArg = '') {
+    const ref = String(roomRef || '').trim().toUpperCase();
+    const provided = String(inviteCodeArg || '').trim().toUpperCase();
+    let room = rooms.get(roomRef);
+    if (!room && ref) {
       room = [...rooms.values()].find(
         (item) =>
-          String(item.code || '').toUpperCase() === code ||
-          String(item.id).toUpperCase() === code,
+          String(item.code || '').toUpperCase() === ref ||
+          String(item.inviteCode || '').toUpperCase() === ref ||
+          String(item.id).toUpperCase() === ref,
       );
     }
     if (!room) throw new RoomError('Стол не найден', 'ROOM_NOT_FOUND');
-    if (room.players.some((p) => p.userId === user.id)) {
+    const alreadySeated = room.players.some((p) => p.userId === user.id);
+    // Приватный стол: пускаем только по коду приглашения (он не виден в лобби).
+    if (!alreadySeated && room.visibility === 'private') {
+      const roomInvite = String(room.inviteCode || '').toUpperCase();
+      const allowed = Boolean(roomInvite) && (provided === roomInvite || ref === roomInvite);
+      if (!allowed) {
+        throw new RoomError('Это приватный стол. Нужен код приглашения', 'PRIVATE_ROOM');
+      }
+    }
+    if (alreadySeated) {
       broadcastRoom(room);
       return room;
     }
@@ -702,6 +748,11 @@ export function createRoomManager({
         const room = {
           ...snapshot,
           code: row.code,
+          buyIn: Number(snapshot.buyIn) || 0,
+          deckSize: normalizeDeckSize(snapshot.deckSize),
+          pot: Number(snapshot.pot) || 0,
+          visibility: snapshot.visibility === 'private' ? 'private' : 'public',
+          inviteCode: snapshot.inviteCode || null,
           lastActivity: Date.now(),
           finishedRecorded: false,
         };
