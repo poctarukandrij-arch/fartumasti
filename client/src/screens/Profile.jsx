@@ -86,7 +86,7 @@ export function Profile({ me, stats, onLogout, onWithdraw, onInventory, refreshM
           <span className="v2-profile__name">
             <PlayerTag
               name={me?.username || 'Без имени'}
-              emoji={equipped?.emojis || me?.emojied?.emojis}
+              emoji={me?.emoji || equipped?.emojis}
               size={18}
             />
             {unlimited ? <span className="v2-badge-unlim">безлимит</span> : null}

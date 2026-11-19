@@ -115,7 +115,7 @@ export function Stats({ me, toast }) {
             <div className="v2-stack" style={{ flex: '1 1 auto' }}>
               <PlayerTag
                 name={me?.username || 'Игрок'}
-                emoji={me?.emojied?.emojis || me?.equipped?.emojis}
+                emoji={me?.emoji || me?.equipped?.emojis}
                 size={16}
                 className="v2-profile__name"
               />
