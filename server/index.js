@@ -437,8 +437,18 @@ export async function buildServer() {
     for (const id of Object.values({ deck: 'deck_graphite', table: 'table_graphite', emoji: 'emoji_none', effect: 'effect_none' })) {
       if (!owned.includes(id)) owned.push(id);
     }
+    const catalog = shop.shopCatalog();
     res.json({
-      ...shop.shopCatalog(),
+      ...catalog,
+      // Реальный пул каждого кейса для рулетки: только те предметы, что сервер
+      // действительно может выдать. Клиент не придумывает награды сам.
+      cases: catalog.cases.map((box) => ({
+        ...box,
+        prizes: box.pool
+          .map((id) => shop.getItem(id))
+          .filter(Boolean)
+          .map(({ id, type, name, rarity, desc }) => ({ id, type, name, rarity, desc })),
+      })),
       owned,
       balance: req.user.balance,
       equipped: shop.equippedOf(req.user),

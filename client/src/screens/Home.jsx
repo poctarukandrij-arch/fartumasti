@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { rub } from '../utils.js';
 import { shareInvite } from '../share.js';
+import { BoltArt, CardsArt, TableArt, GiftArt, CrystalArt, StarArt } from '../components/Art.jsx';
 
 // Пресеты входного взноса в копейках: без взноса, 100 ₽, 500 ₽, 1 000 ₽, 5 000 ₽.
 const BUYINS = [
@@ -16,10 +17,18 @@ const MODES = [
   { id: 'perevodnoy', label: 'Переводной' },
 ];
 
+// Три стандартные колоды, которые поддерживает серверный движок.
 const DECKS = [
-  { value: 36, label: '36 карт' },
-  { value: 52, label: '52 карты' },
+  { value: 24, label: '24', hint: 'от 9' },
+  { value: 36, label: '36', hint: 'от 6' },
+  { value: 52, label: '52', hint: 'от 2' },
 ];
+
+function deckLabel(size) {
+  if (size === 24) return '24 карты';
+  if (size === 52) return '52 карты';
+  return '36 карт';
+}
 
 function playersOf(room) {
   if (Array.isArray(room?.players)) return room.players.length;
@@ -30,7 +39,7 @@ function modeLabel(mode) {
   return mode === 'perevodnoy' ? 'Переводной' : 'Подкидной';
 }
 
-export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
+export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory }) {
   const [sheet, setSheet] = useState(null); // 'create' | 'join' | null
   const [players, setPlayers] = useState(2);
   const [mode, setMode] = useState('podkidnoy');
@@ -45,7 +54,7 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
 
   const summary = useMemo(() => {
     const stake = buyn > 0 ? rub(buyn) : 'без взноса';
-    return `${players} игрока · ${modeLabel(mode)} · ${deckSize} карт · ${stake}`;
+    return `${players} игрока · ${modeLabel(mode)} · ${deckLabel(deckSize)} · ${stake}`;
   }, [players, mode, buyn, deckSize]);
 
   function play() {
@@ -81,16 +90,16 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
   }
 
   return (
-    <div className="screen v2">
-      <section className="v2-hero">
-        <img className="v2-hero__art" src="/art/hero_cards.png" alt="" aria-hidden="true" />
+    <div className="screen v2 v3-home">
+      <section className="v2-hero v3-hero">
+        <img className="v2-hero__art v3-hero__art" src="/art/hero_cards.png" alt="" aria-hidden="true" />
         <span className="v2-hero__rays" aria-hidden="true" />
         <span className="v2-live">
           <span className="v2-live__dot" aria-hidden="true" />
           {online} онлайн
         </span>
-        <h1 className="v2-hero__title">Играй в «Дурака»</h1>
-        <p className="v2-hero__sub">
+        <h1 className="v2-hero__title v3-hero__title">Играй в «Дурака»</h1>
+        <p className="v2-hero__sub v3-hero__sub">
           Живые соперники, честные раздачи и игра с реальными людьми.
         </p>
       </section>
@@ -100,7 +109,9 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
         className={`v2-cta ${inQueue ? 'v2-cta--waiting' : ''}`}
         onClick={play}
       >
-        <img className="v2-cta__art" src="/art/bolt.png" alt="" aria-hidden="true" />
+        <span className="v2-cta__art v3-icon" aria-hidden="true">
+          <BoltArt size={54} />
+        </span>
         <span className="v2-cta__body">
           <span className="v2-cta__label">{inQueue ? 'Поиск соперника…' : 'Играть'}</span>
           <span className="v2-cta__hint">
@@ -113,14 +124,18 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
       <div className="v2-grid2">
         <button type="button" className="v2-tile" onClick={() => setSheet('create')}>
           <span className="v2-tile__glow" aria-hidden="true" />
-          <img className="v2-tile__art" src="/art/cards_fan.png" alt="" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <CardsArt size={62} />
+          </span>
           <span className="v2-tile__title">Создать стол</span>
           <span className="v2-tile__sub">Взнос, колода и режим</span>
         </button>
 
         <button type="button" className="v2-tile v2-tile--cyan" onClick={() => setSheet('join')}>
           <span className="v2-tile__glow" aria-hidden="true" />
-          <img className="v2-tile__art" src="/art/spade.png" alt="" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <TableArt itemId="table_ocean" size={62} />
+          </span>
           <span className="v2-tile__title">Присоединиться</span>
           <span className="v2-tile__sub">По коду стола</span>
         </button>
@@ -128,10 +143,32 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
 
       <button type="button" className="v2-tile v2-tile--pink" onClick={invite}>
         <span className="v2-tile__glow" aria-hidden="true" />
-        <img className="v2-tile__art" src="/art/gift.png" alt="" aria-hidden="true" />
+        <span className="v2-tile__art v3-icon" aria-hidden="true">
+          <GiftArt size={58} />
+        </span>
         <span className="v2-tile__title">Пригласить друга</span>
         <span className="v2-tile__sub">Открыть чаты Telegram и отправить ссылку</span>
       </button>
+
+      <div className="v2-grid2">
+        <button type="button" className="v2-tile v2-tile--violet" onClick={onRules}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <CrystalArt size={54} tone="violet" />
+          </span>
+          <span className="v2-tile__title">Правила игры</span>
+          <span className="v2-tile__sub">Как бить и подкидывать</span>
+        </button>
+
+        <button type="button" className="v2-tile v2-tile--mint" onClick={onInventory}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <StarArt size={54} />
+          </span>
+          <span className="v2-tile__title">Инвентарь</span>
+          <span className="v2-tile__sub">Колоды, столы, эмодзи</span>
+        </button>
+      </div>
 
       <section className="v2-panel">
         <div className="v2-title">
@@ -152,11 +189,14 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
                 className="v2-row"
                 onClick={() => send({ type: 'room:join', roomId: room.id })}
               >
-                <img className="v2-row__art" src="/art/table.png" alt="" aria-hidden="true" />
+                <span className="v2-row__art v3-icon" aria-hidden="true">
+                  <TableArt itemId={room.equippedTable || 'table_graphite'} size={40} />
+                </span>
                 <span className="v2-row__body">
                   <span className="v2-row__name">{room.name || `Стол ${room.code || ''}`}</span>
                   <span className="v2-row__meta">
-                    {playersOf(room)}/{room.maxPlayers || 2} · {modeLabel(room.mode)} · {room.deckSize || 36} карт
+                    {playersOf(room)}/{room.maxPlayers || 2} · {modeLabel(room.mode)} ·{' '}
+                    {deckLabel(Number(room.deckSize) || 36)}
                   </span>
                 </span>
                 <span className="v2-row__side">
@@ -214,7 +254,7 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
 
             <div className="v2-field">
               <span className="v2-field__label">Колода</span>
-              <div className="v2-seg">
+              <div className="v2-seg v2-seg--3">
                 {DECKS.map((item) => (
                   <button
                     key={item.value}
@@ -222,7 +262,8 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
                     className={`v2-seg__btn ${deckSize === item.value ? 'is-on' : ''}`}
                     onClick={() => setDeckSize(item.value)}
                   >
-                    {item.label}
+                    <span className="v3-seg__value">{item.label}</span>
+                    <span className="v3-seg__hint">{item.hint}</span>
                   </button>
                 ))}
               </div>
