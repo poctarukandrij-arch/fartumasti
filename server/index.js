@@ -829,17 +829,26 @@ export async function buildServer() {
               buyIn: Math.trunc(Number(message.buyn ?? message.buyIn) || 0),
               // Допустимы все три колоды движка: 24, 36 и 52 карты.
               deckSize: Number(message.deckSize) || 36,
+              // Открытый стол виден в лобби, приватный — только по коду приглашения.
+              visibility: message.visibility === 'private' ? 'private' : 'public',
             });
             break;
           case 'room:join':
-            rooms.joinRoom(currentUser, String(message.roomId || ''));
+            rooms.joinRoom(
+              currentUser,
+              String(message.roomId || message.code || ''),
+              String(message.inviteCode || message.code || ''),
+            );
             break;
           case 'room:leave':
             rooms.leaveRoom(currentUser.id);
             break;
-          case 'room:start':
-            rooms.startGame(rooms.rooms.get(rooms.userRoom.get(currentUser.id)));
+          case 'room:start': {
+            const currentRoom = rooms.rooms.get(rooms.userRoom.get(currentUser.id));
+            if (!currentRoom) throw new RoomError('Стол не найден', 'ROOM_NOT_FOUND');
+            rooms.startGame(currentRoom);
             break;
+          }
           case 'room:ready':
             rooms.setReady(currentUser.id);
             break;
