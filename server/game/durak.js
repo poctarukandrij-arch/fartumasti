@@ -3,11 +3,15 @@
 export const SUITS = ['s', 'h', 'd', 'c'];
 export const FULL_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 export const RANKS = ['6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-export const DECK_SIZES = [36, 52];
+// Колода 24 карты: с девятки до туза. Колода 52: от двойки до туза.
+export const RANKS_24 = ['9', '10', 'J', 'Q', 'K', 'A'];
+export const DECK_SIZES = [24, 36, 52];
+export const RANKS_BY_SIZE = { 24: RANKS_24, 36: RANKS, 52: FULL_RANKS };
 export const SUIT_SYMBOLS = { s: '♠', h: '♥', d: '♦', c: '♣' };
 export const SUIT_NAMES = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
 
-// Старшинство едино для колоды 36 и 52 карт: 2 < 3 < ... < 10 < J < Q < K < A.
+// Старшинство едино для всех колод: 2 < 3 < ... < 10 < J < Q < K < A.
+// В колоде 24 карты младшая карта — девятка, старшая — туз.
 export const RANK_VALUE = FULL_RANKS.reduce((acc, rank, index) => {
   acc[rank] = index + 2;
   return acc;
@@ -32,11 +36,15 @@ export function cardId(card) {
 
 export function normalizeDeckSize(value) {
   const size = Number(value);
-  return size === 52 ? 52 : 36;
+  return DECK_SIZES.includes(size) ? size : 36;
+}
+
+export function ranksForDeck(deckSize = 36) {
+  return RANKS_BY_SIZE[normalizeDeckSize(deckSize)];
 }
 
 export function makeDeck(deckSize = 36) {
-  const ranks = normalizeDeckSize(deckSize) === 52 ? FULL_RANKS : RANKS;
+  const ranks = ranksForDeck(deckSize);
   const deck = [];
   for (const suit of SUITS) {
     for (const rank of ranks) {
