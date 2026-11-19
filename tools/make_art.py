@@ -13,7 +13,7 @@ import random
 from PIL import Image, ImageDraw, ImageFilter
 
 OUT = os.path.join(os.path.dirname(__file__), '..', 'client', 'public', 'art')
-SS = 4  # supersampling
+SS = 2  # supersampling
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -51,14 +51,12 @@ def mix(a, b, t):
 def gradient(px, c_top, c_bottom, angle=90):
     """Градиент по направлению angle (90 = сверху вниз)."""
     w = px * SS
-    small = Image.new('RGB', (2, 64))
+    small = Image.new('RGB', (1, 64))
     for y in range(64):
-        col = mix(c_top, c_bottom, y / 63)
-        small.putpixel((0, y), col)
-        small.putpixel((1, y), col)
-    grad = small.resize((w, w), Image.BICUBIC)
+        small.putpixel((0, y), mix(c_top, c_bottom, y / 63))
+    grad = small.resize((w, w), Image.BILINEAR)
     if angle != 90:
-        grad = grad.rotate(angle - 90, resample=Image.BICUBIC, expand=False)
+        grad = grad.rotate(angle - 90, resample=Image.BILINEAR, expand=False)
     return grad.convert('RGBA')
 
 
@@ -198,12 +196,20 @@ def ruby_coin(px=256, colors=((255, 236, 170), (214, 138, 32))):
     ink = body(px, inner, mix(colors[0], (255, 255, 255), .25), mix(colors[1], (120, 60, 10), .25),
                rim=(255, 245, 200), rim_alpha=120, ao=120, spec=True)
     px_c.alpha_composite(ink)
-    # символ рубля
+    # символ рубля (рисуем геометрией, без шрифтов)
     d = ImageDraw.Draw(px_c)
-    w = px * SS
-    col = (120, 62, 12, 235)
-    f = int(px * SS * 0.34)
-    d.text((w * 0.5, w * 0.5), '₽', font=None, fill=col, anchor='mm')
+    s = px * SS
+    col = (118, 60, 10, 238)
+    bar = s * .052
+    # вертикальная стойка
+    d.rounded_rectangle([s * .40, s * .31, s * .40 + bar, s * .70], radius=bar * .3, fill=col)
+    # чаша «P»
+    d.arc([s * .40 - s * .17, s * .30, s * .40 + s * .20, s * .52], start=-90, end=90,
+          width=int(bar), fill=col)
+    d.rounded_rectangle([s * .40, s * .31, s * .45, s * .515], radius=bar * .2, fill=col)
+    # две перекладины
+    d.rounded_rectangle([s * .33, s * .505, s * .60, s * .505 + bar * .8], radius=bar * .3, fill=col)
+    d.rounded_rectangle([s * .33, s * .60, s * .60, s * .60 + bar * .8], radius=bar * .3, fill=col)
     return finish(px_c, px)
 
 
@@ -514,11 +520,8 @@ def hero_composition(px=768):
     lay = Image.new('RGBA', img.size, (140, 90, 255, 0))
     lay.putalpha(soft(glow, px * .05).point(lambda v: int(v * .5)))
     img.alpha_composite(lay)
-    for angle, scale, dy in ((-18, .62, .0), (14, .66, .02)):
-        card = card_back(px, scale * .52, angle)
-        img.alpha_composite(card)
-    img.alpha_composite(chest(int(px * .62), 'deck').resize((int(px * .62), int(px * .62)), Image.LANCZOS)
-                        if False else Image.new('RGBA', (1, 1)))
+    for angle in (-16, 4, 20):
+        img.alpha_composite(card_back(px, .62, angle))
     return finish(img, px)
 
 
