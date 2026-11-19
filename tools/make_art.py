@@ -481,16 +481,21 @@ def effect_sparks(px=384):
 
 def emoji_badge(px=256):
     img = blank(px)
-    ring = ellipse(px, (px * .06, px * .06, px * .94, px * .94))
-    img.alpha_composite(body(px, ring, (255, 244, 206), (176, 118, 24), rim=(255, 255, 240), rim_alpha=220, ao=150))
-    hole = ellipse(px, (px * .17, px * .17, px * .83, px * .83))
-    cut = Image.new('RGBA', img.size, (0, 0, 0, 0))
-    hole_inv = Image.eval(hole, lambda v: 255 - v)
-    img.putalpha(Image.composite(img.getchannel('A'), Image.new('L', img.size, 0), hole_inv))
+    ring = mask(px, lambda d: d.ellipse(
+        [px * .06 * SS, px * .06 * SS, px * .94 * SS, px * .94 * SS],
+        outline=255, width=int(px * .1 * SS)))
+    img.alpha_composite(body(px, ring, (255, 244, 206), (176, 118, 24),
+                             rim=(255, 255, 240), rim_alpha=220, ao=150))
+    inner = mask(px, lambda d: d.ellipse(
+        [px * .2 * SS, px * .2 * SS, px * .8 * SS, px * .8 * SS],
+        outline=255, width=int(px * .018 * SS)))
+    lay = Image.new('RGBA', img.size, (255, 255, 255, 0))
+    lay.putalpha(soft(inner, 1).point(lambda v: int(v * .55)))
+    img.alpha_composite(lay)
     return finish(img, px)
 
 
-def felt(px=768, theme='midnight'):
+def felt(px=512, theme='midnight'):
     themes = {
         'midnight': ((30, 24, 62), (10, 8, 22), (120, 90, 220)),
         'aurora': ((20, 62, 70), (8, 16, 30), (90, 230, 210)),
@@ -498,20 +503,18 @@ def felt(px=768, theme='midnight'):
         'emerald': ((16, 58, 44), (8, 18, 16), (110, 230, 170)),
     }
     top, deep, accent = themes.get(theme, themes['midnight'])
-    img = radial(px, top, deep, radius=.75).resize((px, px))
+    base = radial(px, top, deep, radius=.75).resize((px, px), Image.LANCZOS).convert('RGBA')
     glow = ellipse(px, (px * .18, px * .1, px * .82, px * .8))
     layer = Image.new('RGBA', (px, px), accent + (0,))
     layer.putalpha(soft(glow, px * .04).point(lambda v: int(v * .18)))
-    base = img.convert('RGBA')
     base.alpha_composite(layer)
     grain(base, 14)
-    # виньетка
     vig = ellipse(px, (px * .12, px * .12, px * .88, px * .88))
     inv = Image.eval(vig, lambda v: 255 - v)
     dark = Image.new('RGBA', (px, px), (4, 2, 10, 0))
     dark.putalpha(inv.point(lambda v: int(v * .55)))
     base.alpha_composite(dark)
-    return base.resize((px, px), Image.LANCZOS)
+    return base
 
 
 def hero_composition(px=768):
