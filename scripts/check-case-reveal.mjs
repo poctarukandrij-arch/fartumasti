@@ -1,6 +1,6 @@
 // Проверка кейса: анимация обязана показать именно ту награду, которую выдал сервер.
-// Скрипт сам поднимает сервер на свободном порту с временной БД, открывает кейс
-// через интерфейс и сравнивает текст на экране с телом ответа /api/shop/case.
+// Скрипт сам поднимает сервер на временной БД, готовит аккаунт через API,
+// открывает кейс в интерфейсе и сравнивает текст на экране с ответом /api/shop/case.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -35,6 +35,20 @@ const fail = (message) => {
   process.exitCode = 1;
 };
 
+async function api(path, { method = 'GET', body, token } = {}) {
+  const headers = { Accept: 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`${path} → ${res.status} ${data?.message || data?.error || ''}`);
+  return data;
+}
+
 try {
   let ready = false;
   for (let i = 0; i < 60; i += 1) {
@@ -46,8 +60,22 @@ try {
   }
   if (!ready) throw new Error('сервер не поднялся');
 
+  // Аккаунт готовим заранее: при первом входе сервер требует задать имя.
+  const auth = await api('/api/auth/telegram', {
+    method: 'POST',
+    body: { devUserId: 'archi', devName: 'Archi', token: '' },
+  });
+  const token = auth.token;
+  if (!token) throw new Error('сервер не выдал токен входа');
+  if (auth.user?.needsUsername) {
+    await api('/api/auth/name', { method: 'POST', body: { name: 'Archi' }, token });
+  }
+
   browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript((value) => {
+    try { localStorage.setItem('fartu_token', value); } catch { /* приватный режим */ }
+  }, token);
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -61,18 +89,8 @@ try {
     } catch { /* тело уже прочитано */ }
   });
 
-  const consoleErrors = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
-
   await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-  // Панель тестового входа появляется после ожидания initData (~6 c).
-  await page.waitForSelector('#dev-id', { timeout: 25000 });
-  await page.fill('#dev-id', 'archi');
-  await page.fill('#dev-name', 'Archi');
-  await page.getByRole('button', { name: 'Войти в тестовом режиме' }).click();
-  await page.waitForSelector('.bottomnav', { timeout: 20000 });
+  await page.waitForSelector('.topbar', { timeout: 30000 });
 
   await page.getByRole('button', { name: 'Магазин', exact: true }).click();
   await page.getByRole('tab', { name: 'Кейсы' }).click();
@@ -87,7 +105,6 @@ try {
   if (!serverAward) fail('не удалось прочитать награду из ответа сервера');
   else if (shown !== serverAward) fail(`на экране «${shown}», сервер выдал «${serverAward}»`);
   if (pageErrors.length) fail(`ошибки страницы: ${pageErrors.join(' | ')}`);
-  if (consoleErrors.length) console.warn(`консоль: ${consoleErrors.slice(0, 3).join(' | ')}`);
 
   if (!process.exitCode) {
     await page.getByRole('button', { name: 'Забрать' }).click();
@@ -97,10 +114,9 @@ try {
 } catch (error) {
   fail(error.message);
   if (browser) {
-    const pages = browser.contexts().flatMap((ctx) => ctx.pages());
-    for (const p of pages) {
+    for (const page of browser.contexts().flatMap((ctx) => ctx.pages())) {
       try {
-        const text = (await p.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
+        const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
         console.error(`ЭКРАН: ${text}`);
       } catch { /* страница уже закрыта */ }
     }
