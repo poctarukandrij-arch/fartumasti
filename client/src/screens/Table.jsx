@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import PlayingCard, { CardBack } from '../components/PlayingCard.jsx';
 import Seat from '../components/Seat.jsx';
+import { PlayerTag } from '../components/PlayerTag.jsx';
 import Chat from '../components/Chat.jsx';
 import { deckClassOf, tableClassOf } from '../catalog.js';
 import { suitSymbol } from '../utils.js';
@@ -231,7 +232,11 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
             <div className="seats-dots">
               {room.players.map((player) => (
                 <span key={player.userId} className={`seat-dot ${player.connected ? 'seat-dot--on' : ''}`}>
-                  {player.username}
+                  <PlayerTag
+                    name={player.username}
+                    emoji={player.equipped?.emojis || player.emojis}
+                    size={12}
+                  />
                   {player.ready ? ' ✓' : ''}
                 </span>
               ))}
@@ -424,7 +429,11 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
               .map((player) => (
                 <div key={player.userId} className="voice-row">
                   <span className="voice-row__name">
-                    {player.username}
+                    <PlayerTag
+                      name={player.username}
+                      emoji={player.equipped?.emojis || player.emojis}
+                      size={13}
+                    />
                     {player.mic ? <span className="voice-chip voice-chip--live">говорит</span> : null}
                   </span>
                   <button
