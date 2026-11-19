@@ -1,26 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { rub, shortDate, relativeTime } from '../utils.js';
-import { TrophyArt, ChartArt, StarArt, CardsArt, CoinArt, GiftArt } from '../components/Art.jsx';
+import { rub, shortDate } from '../utils.js';
+import { PlayerTag } from '../components/PlayerTag.jsx';
 
-const TABS = [
-  { id: 'games', label: 'История игр' },
-  { id: 'money', label: 'Операции' },
-  { id: 'buys', label: 'Покупки' },
-];
+const num = (value) => Number(value) || 0;
+
+function rateOf(wins, games) {
+  if (!games) return 0;
+  return Math.round((wins / games) * 100);
+}
 
 export function Stats({ me, toast }) {
-  const [tab, setTab] = useState('games');
+  const [tab, setTab] = useState('mine');
   const [data, setData] = useState(null);
+  const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    api('/stats')
-      .then((payload) => {
-        if (alive) setData(payload);
+    Promise.all([api('/stats'), api('/leaderboard')])
+      .then(([statsData, boardData]) => {
+        if (!alive) return;
+        setData(statsData);
+        setBoard(boardData);
       })
-      .catch((error) => toast(error.message, 'error'))
+      .catch((error) => toast?.(error.message, 'error'))
       .finally(() => {
         if (alive) setLoading(false);
       });
@@ -29,172 +33,228 @@ export function Stats({ me, toast }) {
     };
   }, [toast]);
 
-  const stats = data?.stats || me?.stats || { gamesPlayed: 0, wins: 0, losses: 0, winRate: 0 };
+  const stats = data?.stats || me?.stats || {};
+  const games = num(stats.gamesPlayed ?? stats.games ?? stats.total);
+  const wins = num(stats.wins);
+  const losses = num(stats.losses ?? Math.max(0, games - wins));
+  const rate = rateOf(wins, games);
+
   const history = data?.history || [];
   const transactions = data?.transactions || [];
-  const purchases = data?.purchases || [];
+  const top = board?.top || [];
+  const myRank = board?.me || null;
+  const myId = me?.id || me?.userId;
 
-  const total = Math.max(1, Number(stats.gamesPlayed) || 0);
-  const winShare = Math.min(100, Math.max(0, Number(stats.winRate) || 0));
+  const inTop = useMemo(
+    () => top.some((row) => row.isMe || (myId && row.userId === myId)),
+    [top, myId],
+  );
+
+  function historyRow(row) {
+    const won =
+      typeof row.won === 'boolean'
+        ? row.won
+        : row.result === 'win' || (row.winnerId && row.winnerId === myId);
+    const when = row.endedAt || row.finishedAt || row.createdAt || row.startedAt;
+    return (
+      <div key={row.id || row.matchId || when} className="v2-rank">
+        <span className={`v2-rank__pos`} aria-hidden="true">
+          {won ? '✓' : '✕'}
+        </span>
+        <span className="v2-rank__body">
+          <span className="v2-rank__name">{won ? 'Победа' : 'Поражение'}</span>
+          <span className="v2-rank__meta">
+            {row.rounds ? `${row.rounds} раундов · ` : ''}
+            {shortDate(when)}
+          </span>
+        </span>
+        <span className="v2-rank__val" style={{ color: won ? '#7ff0cd' : '#ff9dbb' }}>
+          {won ? '+1' : '—'}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div className="screen">
-      <div className="fm-section">
-        <div>
-          <span className="fm-eyebrow">Ваш прогресс</span>
-          <h2 className="fm-title">Статистика</h2>
-        </div>
-        <span className="fm-section__hint">{total} партий</span>
+    <div className="screen v2">
+      <div className="v2-title">
+        <span>Статистика</span>
+        <span className="v2-chip">{board?.total ? `${board.total} игроков` : 'онлайн'}</span>
       </div>
 
-      <div className="fm-grid">
-        <div className="fm-stat">
-          <span className="fm-stat__ico" aria-hidden="true">
-            <CardsArt size={26} />
-          </span>
-          <span className="fm-stat__label">Партии</span>
-          <span className="fm-stat__value">{stats.gamesPlayed ?? 0}</span>
-        </div>
-        <div className="fm-stat">
-          <span className="fm-stat__ico" aria-hidden="true">
-            <TrophyArt size={26} />
-          </span>
-          <span className="fm-stat__label">Победы</span>
-          <span className="fm-stat__value fm-stat__value--mint">{stats.wins ?? 0}</span>
-        </div>
-        <div className="fm-stat">
-          <span className="fm-stat__ico" aria-hidden="true">
-            <StarArt size={26} />
-          </span>
-          <span className="fm-stat__label">Поражения</span>
-          <span className="fm-stat__value fm-stat__value--pink">{stats.losses ?? 0}</span>
-        </div>
-        <div className="fm-stat">
-          <span className="fm-stat__ico" aria-hidden="true">
-            <ChartArt size={26} />
-          </span>
-          <span className="fm-stat__label">Процент побед</span>
-          <span className="fm-stat__value fm-stat__value--violet">{stats.winRate ?? 0}%</span>
-        </div>
+      <div className="v2-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'mine'}
+          className={`v2-tab ${tab === 'mine' ? 'is-on' : ''}`}
+          onClick={() => setTab('mine')}
+        >
+          Моя статистика
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'all'}
+          className={`v2-tab ${tab === 'all' ? 'is-on' : ''}`}
+          onClick={() => setTab('all')}
+        >
+          Все игроки
+        </button>
       </div>
 
-      <div className="fm-panel fm-panel--tight" style={{ marginTop: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-          <span className="fm-stat__label">Соотношение побед</span>
-          <span className="fm-stat__label" style={{ color: '#3de3b0' }}>
-            {winShare}%
-          </span>
-        </div>
-        <div className="fm-progress" aria-hidden="true">
-          <span style={{ width: `${winShare}%` }} />
-        </div>
-      </div>
-
-      <div className="fm-section">
-        <span className="fm-section__title">История</span>
-      </div>
-
-      <div className="fm-tabs" role="tablist">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            className={`fm-chip ${tab === item.id ? 'fm-chip--on' : ''}`}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="fm-list">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="skeleton" style={{ height: 56, borderRadius: 15 }} />
-          ))}
-        </div>
-      ) : tab === 'games' ? (
-        history.length === 0 ? (
-          <div className="empty">Вы ещё не сыграли ни одной партии. Начните с главного экрана.</div>
-        ) : (
-          <div className="fm-list">
-            {history.map((row) => (
-              <div key={row.matchId} className="fm-row">
-                <span className="fm-row__ico" aria-hidden="true">
-                  {row.isWinner ? <TrophyArt size={20} /> : <CardsArt size={20} />}
-                </span>
-                <span className="fm-row__body">
-                  <span className="fm-row__title">
-                    {row.isWinner ? 'Победа' : 'Поражение'}
-                    {row.durakName ? ` · дурак: ${row.durakName}` : ''}
-                  </span>
-                  <span className="fm-row__sub">
-                    {relativeTime(row.endedAt)} · {row.rounds || 0} раундов
-                    {(row.players || []).length ? ` · ${(row.players || []).join(', ')}` : ''}
-                  </span>
-                </span>
-                <span
-                  className="fm-row__value"
-                  style={{ color: row.isWinner ? '#3de3b0' : '#ff8fb8' }}
-                >
-                  {row.place ? `${row.place} место` : shortDate(row.endedAt)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )
-      ) : tab === 'money' ? (
-        transactions.length === 0 ? (
-          <div className="empty">Операций пока нет.</div>
-        ) : (
-          <div className="fm-list">
-            {transactions.map((row) => {
-              const amount = Number(row.amount ?? row.value ?? 0);
-              const title = row.reason || row.title || row.kind || row.type || 'Операция';
-              return (
-                <div key={row.id} className="fm-row">
-                  <span className="fm-row__ico" aria-hidden="true">
-                    <CoinArt size={20} />
-                  </span>
-                  <span className="fm-row__body">
-                    <span className="fm-row__title">{title}</span>
-                    <span className="fm-row__sub">{relativeTime(row.createdAt ?? row.created_at)}</span>
-                  </span>
-                  <span
-                    className="fm-row__value"
-                    style={{ color: amount >= 0 ? '#3de3b0' : '#ff8fb8' }}
-                  >
-                    {amount >= 0 ? '+' : '−'}
-                    {rub(Math.abs(amount))}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )
-      ) : purchases.length === 0 ? (
-        <div className="empty">Покупок пока нет.</div>
-      ) : (
-        <div className="fm-list">
-          {purchases.map((row) => (
-            <div key={row.id} className="fm-row">
-              <span className="fm-row__ico" aria-hidden="true">
-                <GiftArt size={20} />
-              </span>
-              <span className="fm-row__body">
-                <span className="fm-row__title">{row.itemName || row.item_id || row.itemId || 'Предмет'}</span>
-                <span className="fm-row__sub">
-                  {row.kind === 'case' ? 'Кейс' : 'Предмет'} · {relativeTime(row.createdAt ?? row.created_at)}
-                </span>
-              </span>
-              <span className="fm-row__value" style={{ color: '#cfd5f6' }}>
-                {rub(row.price)}
+      {tab === 'mine' ? (
+        <>
+          <section className="v2-stats-hero">
+            <div className="v2-ring" style={{ '--p': rate }}>
+              <span className="v2-ring__value">
+                <span className="v2-ring__num">{rate}%</span>
+                <span className="v2-ring__cap">побед</span>
               </span>
             </div>
-          ))}
-        </div>
+            <div className="v2-stack" style={{ flex: '1 1 auto' }}>
+              <PlayerTag
+                name={me?.username || 'Игрок'}
+                emoji={me?.emojied?.emojis || me?.equipped?.emojis}
+                size={16}
+                className="v2-profile__name"
+              />
+              <span className="v2-eyebrow">личный зачёт</span>
+              <div className="v2-metrics">
+                <div className="v2-metric">
+                  <span className="v2-metric__num">{games}</span>
+                  <span className="v2-metric__label">партий</span>
+                </div>
+                <div className="v2-metric v2-metric--win">
+                  <span className="v2-metric__num">{wins}</span>
+                  <span className="v2-metric__label">побед</span>
+                </div>
+                <div className="v2-metric v2-metric--lose">
+                  <span className="v2-metric__num">{losses}</span>
+                  <span className="v2-metric__label">поражений</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="v2-panel">
+            <div className="v2-title">
+              <span>История игр</span>
+              <span className="v2-chip">{history.length}</span>
+            </div>
+            {loading ? (
+              <div className="v2-empty">Загружаем историю…</div>
+            ) : history.length === 0 ? (
+              <div className="v2-empty">Партий пока нет. Сыграй первую — статистика появится здесь.</div>
+            ) : (
+              <div className="v2-stack">{history.slice(0, 20).map(historyRow)}</div>
+            )}
+          </section>
+
+          <section className="v2-panel">
+            <div className="v2-title">
+              <span>Финансовая история</span>
+              <span className="v2-chip">{transactions.length}</span>
+            </div>
+            {transactions.length === 0 ? (
+              <div className="v2-empty">Операций пока нет.</div>
+            ) : (
+              <div className="v2-stack">
+                {transactions.slice(0, 20).map((row) => {
+                  const amount = num(row.amount);
+                  const positive = amount >= 0;
+                  return (
+                    <div key={row.id || row.txId} className="v2-rank">
+                      <span className="v2-rank__pos" aria-hidden="true">
+                        {positive ? '+' : '−'}
+                      </span>
+                      <span className="v2-rank__body">
+                        <span className="v2-rank__name">{row.title || row.kind || 'Операция'}</span>
+                        <span className="v2-rank__meta">{shortDate(row.createdAt)}</span>
+                      </span>
+                      <span
+                        className="v2-rank__val"
+                        style={{ color: positive ? '#7ff0cd' : '#ff9dbb' }}
+                      >
+                        {positive ? '+' : '−'}
+                        {rub(Math.abs(amount))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="v2-panel">
+            <div className="v2-title">
+              <span>Рейтинг игроков</span>
+              <span className="v2-chip">по победам</span>
+            </div>
+
+            {loading ? (
+              <div className="v2-empty">Загружаем рейтинг…</div>
+            ) : top.length === 0 ? (
+              <div className="v2-empty">Рейтинг появится после первых партий.</div>
+            ) : (
+              <div className="v2-stack">
+                {top.map((row) => (
+                  <div
+                    key={row.userId || row.rank}
+                    className={`v2-rank v2-rank--${row.rank <= 3 ? row.rank : 'n'} ${
+                      row.isMe || row.userId === myId ? 'v2-rank--me' : ''
+                    }`}
+                  >
+                    <span className="v2-rank__pos">{row.rank}</span>
+                    <span className="v2-rank__body">
+                      <span className="v2-rank__name">
+                        <PlayerTag name={row.name} emoji={row.emojis} size={14} />
+                        {row.unlimited ? <span className="v2-badge-unlim">∞</span> : null}
+                        {row.isMe || row.userId === myId ? (
+                          <span className="v2-chip">вы</span>
+                        ) : null}
+                      </span>
+                      <span className="v2-rank__meta">
+                        {num(row.gamesPlayed)} партий · {num(row.losses)} поражений
+                      </span>
+                    </span>
+                    <span className="v2-rank__val">
+                      {num(row.wins)}
+                      <small>побед</small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {!inTop && myRank ? (
+            <section className="v2-panel">
+              <div className="v2-title">
+                <span>Моя позиция</span>
+                <span className="v2-chip v2-chip--mint">#{myRank.rank}</span>
+              </div>
+              <div className="v2-rank v2-rank--me">
+                <span className="v2-rank__pos">{myRank.rank}</span>
+                <span className="v2-rank__body">
+                  <span className="v2-rank__name">
+                    <PlayerTag name={myRank.name || me?.username} emoji={myRank.emojis} size={14} />
+                    <span className="v2-chip">вы</span>
+                  </span>
+                  <span className="v2-rank__meta">
+                    {num(myRank.gamesPlayed)} партий · {num(myRank.losses)} поражений
+                  </span>
+                </span>
+                <span className="v2-rank__val">
+                  {num(myRank.wins)}
+                  <small>побед</small>
+                </span>
+              </div>
+            </section>
+          ) : null}
+        </>
       )}
     </div>
   );

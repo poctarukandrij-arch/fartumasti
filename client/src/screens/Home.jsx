@@ -91,13 +91,13 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
         </span>
         <h1 className="v2-hero__title">Играй в «Дурака»</h1>
         <p className="v2-hero__sub">
-          Живые соперники, честные раздачи и стры с реальными игроками.
+          Живые соперники, честные раздачи и игра с реальными людьми.
         </p>
       </section>
 
       <button
         type="button"
-        className={`v2-cta ${inQueue ? 'v2-cta--waitting' : ''}`}
+        className={`v2-cta ${inQueue ? 'v2-cta--waiting' : ''}`}
         onClick={play}
       >
         <img className="v2-cta__art" src="/art/bolt.png" alt="" aria-hidden="true" />
@@ -121,7 +121,7 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
         <button type="button" className="v2-tile v2-tile--cyan" onClick={() => setSheet('join')}>
           <span className="v2-tile__glow" aria-hidden="true" />
           <img className="v2-tile__art" src="/art/spade.png" alt="" aria-hidden="true" />
-          <span className="v2-tile__title">Присоедниться</span>
+          <span className="v2-tile__title">Присоединиться</span>
           <span className="v2-tile__sub">По коду стола</span>
         </button>
       </div>
@@ -141,7 +141,7 @@ export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
 
         {rooms.length === 0 ? (
           <div className="v2-empty">
-            Пока нет открутых столов. Создай свой — и пригласи друга.
+            Пока нет открытых столов. Создай свой — и пригласи друга.
           </div>
         ) : (
           <div className="v2-stack">
