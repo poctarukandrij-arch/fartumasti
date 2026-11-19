@@ -382,7 +382,14 @@ export default function App() {
         ) : (
           <div className="screen" key={tab}>
             {tab === 'home' ? (
-              <Home me={me.user} lobby={lobby} send={send} toast={toast} inQueue={inQueue} />
+              <Home
+                me={me.user}
+                lobby={lobby}
+                send={send}
+                toast={toast}
+                inQueue={inQueue}
+                onBalance={() => setBalanceOpen(true)}
+              />
             ) : null}
             {tab === 'shop' ? <Shop me={me.user} toast={toast} refreshMe={refreshMe} /> : null}
             {tab === 'stats' ? <Stats me={{ ...me.user, stats: me.stats }} toast={toast} /> : null}
