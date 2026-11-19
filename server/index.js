@@ -22,7 +22,7 @@ import {
   devLoginEnabled,
 } from './auth.js';
 import * as shop from './shop.js';
-import { credit, debit, listTransactions, listPurchases, WalletError, isUnlimited, applyUnlimitedGrant } from './wallet.js';
+import { credit, debit, listTransactions, listPurchases, WalletError, isUnlimited, applyUnlimitedGrant, ensureUnlimitedAccounts } from './wallet.js';
 import {
   createDeposit,
   confirmProviderPayment,
@@ -93,31 +93,20 @@ function publicConfig() {
 }
 
 /**
- * Закрепляет безлимитный виртуальный баланс за аккаунтом владельца по внутреннему id.
- * Имя используется только один раз для первичной привязки, дальше — сохранённый id.
+ * Закрепляет безлимитный виртуальный баланс за служебными аккаунтами (Archi, boss, toni).
+ * Привязка идёт по внутреннему id пользователя и сохраняется в настройках, поэтому
+ * переименование аккаунта не выдаёт и не отнимает права.
  */
 function bootstrapUnlimited() {
-  const explicit = Number(process.env.ARCHI_USER_ID || 0) || null;
-  if (explicit) {
-    applyUnlimitedGrant({ userId: explicit });
-    setSetting('archi_user_id', explicit);
-    return;
-  }
-  if (process.env.ARCHI_TELEGRAM_ID) {
-    const bound = applyUnlimitedGrant({ telegramId: process.env.ARCHI_TELEGRAM_ID });
-    if (bound) setSetting('archi_user_id', bound);
-    return;
-  }
-  const saved = getSetting('archi_user_id');
-  if (saved) {
-    applyUnlimitedGrant({ userId: Number(saved) });
-    return;
-  }
-  const rows = db.all("SELECT id FROM users WHERE username = 'Archi' COLLATE NOCASE");
-  if (rows.length === 1) {
-    applyUnlimitedGrant({ userId: rows[0].id });
-    setSetting('archi_user_id', rows[0].id);
-  }
+  const explicitIds = String(process.env.UNLIMITED_USER_IDS || '')
+    .split(',')
+    .map((value) => Number(String(value).trim()))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  for (const id of explicitIds) applyUnlimitedGrant({ userId: id });
+
+  const bound = ensureUnlimitedAccounts();
+  const keys = Object.keys(bound);
+  if (keys.length) console.log('[unlimited] безлимит закреплён:', keys.join(', '));
 }
 
 function userStats(user) {
@@ -295,6 +284,14 @@ export async function buildServer() {
       }
       if (!user) return fail(res, 500, 'USER_CREATE_FAILED', 'Не удалось создать профиль');
       if (user.banned) return fail(res, 403, 'USER_BANNED', 'Аккаунт заблокирован');
+
+      // Безлимит служебных аккаунтов перепроверяется при каждом входе (logout/login).
+      try {
+        bootstrapUnlimited();
+        user = getUserById(user.id) || user;
+      } catch (error) {
+        console.warn('[unlimited] привязка не выполнена:', error.message);
+      }
 
       const token = createSession(user.id);
       res.json({ token, isNew, ...mePayload(user) });
