@@ -883,3 +883,307 @@ input[type='number'] {
 .v3-case__title {
   display: block;
 }
+
+/* ── 13. Эмблема «Дурака», свёрнутые редкости, широкие экраны ───────────── */
+
+/* 13.1 Эмблема: крупнее, чуть правее, полностью статичная и без теней.
+   Никакого плавания, свечения и drop-shadow — только сама графика. */
+.fm-emblem {
+  width: 152px;
+  margin-left: auto;
+  margin-right: -4px;
+  transform: translateX(3px);
+  animation: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+.fm-emblem svg,
+.fm-emblem svg * {
+  filter: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+.fm-emblem__glow {
+  display: none !important;
+}
+
+@media (min-width: 400px) {
+  .fm-emblem {
+    width: 164px;
+  }
+}
+
+@media (max-width: 359px) {
+  .fm-emblem {
+    width: 118px;
+    margin-right: -2px;
+    transform: translateX(2px);
+  }
+}
+
+/* 13.2 Свёрнутые секции редкости — одинаковые для любого кейса */
+.fm-rar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.fm-rar__sec {
+  width: 100%;
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.035);
+  overflow: hidden;
+}
+
+.fm-rar__sec.is-open {
+  border-color: rgba(150, 120, 255, 0.42);
+  background: rgba(120, 92, 255, 0.09);
+}
+
+.fm-rar__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: #e8ecff;
+  font-family: var(--fm-font-display, inherit);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+
+.fm-rar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+
+.fm-rar__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-rar__meta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9aa4cf;
+}
+
+.fm-rar__chev {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.fm-rar__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.fm-rar__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fm-rar__art {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.fm-rar__name {
+  max-width: 100%;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #dfe4ff;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-rar__rate {
+  font-size: 10px;
+  color: #8d99bf;
+}
+
+/* 13.3 Статистика: «Партии», «Побед», «Поражений» внутри своих карточек */
+.v2-metrics {
+  width: 100%;
+}
+
+.v2-metric {
+  min-width: 0;
+  padding: 10px 7px;
+  align-items: center;
+  text-align: center;
+}
+
+.v2-metric__num {
+  max-width: 100%;
+  font-size: clamp(15px, 4.6vw, 19px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.v2-metric__label {
+  max-width: 100%;
+  font-size: clamp(8px, 2.35vw, 9.5px);
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.v2-stats-hero {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.v2-stats-hero .v2-stack {
+  flex: 1 1 190px;
+  min-width: 0;
+}
+
+/* 13.4 Шире контент: меньше пустых полей по краям, крупнее кнопки */
+.app__main {
+  padding-left: max(10px, env(safe-area-inset-left, 0px));
+  padding-right: max(10px, env(safe-area-inset-right, 0px));
+}
+
+.cs-sheet__panel,
+.fm-modal__sheet {
+  padding-left: max(10px, env(safe-area-inset-left, 0px));
+  padding-right: max(10px, env(safe-area-inset-right, 0px));
+}
+
+.v2-cta,
+.v2-tile,
+.v2-row,
+.v2-panel,
+.fm-cta,
+.v3-case__buy {
+  width: 100%;
+  min-width: 0;
+}
+
+.v2-grid2 {
+  width: 100%;
+  gap: 10px;
+}
+
+.v2-grid2 .v2-btn,
+.v2-grid2 .v2-tile {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 8px;
+  font-size: clamp(11.5px, 3.3vw, 13px);
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+}
+
+/* 13.5 Баланс: «Пополнить» и «Вывести» делят ширину и не выходят за неё */
+.fm-segment {
+  width: 100%;
+}
+
+.fm-segment__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 11px 8px;
+  font-size: clamp(11.5px, 3.4vw, 13px);
+  box-shadow: none !important;
+}
+
+.fm-segment__btn--on {
+  box-shadow: none !important;
+}
+
+.fm-cta {
+  padding-inline: 12px;
+  box-shadow: none !important;
+}
+
+.fm-cta__tag {
+  flex: 0 0 auto;
+}
+
+.fm-wallet-hero,
+.fm-method,
+.fm-min-note,
+.fm-field {
+  min-width: 0;
+}
+
+.fm-wallet-hero__amount {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 13.6 Кнопки без теней на всех экранах */
+button,
+[role='button'],
+.btn,
+.v2-btn,
+.v2-cta,
+.v2-tile,
+.v2-row,
+.v2-tab,
+.v2-seg__btn,
+.v3-cat,
+.v3-case__rates,
+.v3-case__buy,
+.fm-cta,
+.fm-chip,
+.fm-segment__btn,
+.fm-iconbtn,
+.fm-item__btn,
+.fm-row__action,
+.fm-nav__item,
+.fm-switch,
+.fm-rar__btn,
+.balance-chip,
+.balance-chip__plus,
+.segmented__btn,
+.tabs__btn,
+.nav__item {
+  box-shadow: none !important;
+  filter: none !important;
+}

@@ -5,6 +5,7 @@ import { Sheet } from '../components/Sheet.jsx';
 import { CaseScene } from '../components/CaseScene.jsx';
 import { BankCardArt, BankCaseArt, bankOf } from '../components/BankCard.jsx';
 import { BankCasePanel } from '../components/BankCase.jsx';
+import { CaseRaritySections } from '../components/CaseRarity.jsx';
 import { playCaseSpin, playCaseWin } from '../sfx.js';
 import {
   ChestArt,
@@ -499,23 +500,11 @@ export function Shop({ me, toast, refreshMe }) {
         title={ratesBox ? `${ratesBox.name} — шансы` : 'Шансы'}
         subtitle="Все награды и вероятности выпадения"
       >
-        <div className="fm-rates">
-          {(ratesBox?.prizes || []).map((prize) => {
-            const row = (ratesBox?.dropRates || []).find((entry) => entry.id === prize.id);
-            return (
-              <div key={prize.id} className="fm-rates__row">
-                <span className="fm-rates__art" aria-hidden="true">{itemArt(prize, 30)}</span>
-                <span className="fm-rates__body">
-                  <span className="fm-rates__name">{prize.name}</span>
-                  <span className={`fm-rates__tag v2-rarity v2-rarity--${prize.rarity}`}>
-                    {RARITY_LABEL[prize.rarity] || 'обычный'}
-                  </span>
-                </span>
-                <span className="fm-rates__value num">{row ? `${row.rate}%` : '—'}</span>
-              </div>
-            );
-          })}
-        </div>
+        <CaseRaritySections
+          box={ratesBox}
+          rates={ratesBox?.dropRates}
+          renderArt={(prize, size) => itemArt(prize, size)}
+        />
         <p className="fm-fineprint">
           Вероятности заданы на сервере и не зависят от анимации. Награду всегда определяет сервер.
         </p>

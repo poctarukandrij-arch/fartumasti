@@ -1,14 +1,10 @@
 import { BankCardArt, BankCaseArt } from './BankCard.jsx';
+import { CaseRaritySections } from './CaseRarity.jsx';
 import { rub } from '../utils.js';
 
-// Кейс «Банковские карты»: витрина с тремя отдельными уровнями редкости.
-// Названия групп фиксированы, а проценты берутся из серверной конфигурации
-// (dropRates), поэтому в интерфейсе нет выдуманных шансов.
-const GROUPS = [
-  { rarity: 'legendary', title: 'САМЫЕ РЕДКИЕ' },
-  { rarity: 'rare', title: 'СРЕДНЯЯ РЕДКОСТЬ' },
-  { rarity: 'common', title: 'ОБЫЧНАЯ РЕДКОСТЬ' },
-];
+// Кейс «Банковские карты»: витрина с уровнями редкости.
+// Редкости свёрнуты в компактные кнопки (общий компонент CaseRaritySections),
+// проценты берутся только из серверной конфигурации (dropRates).
 
 export function BankCasePanel({
   box,
@@ -26,6 +22,7 @@ export function BankCasePanel({
       ? box.prizes
       : (box.pool || []).map((id) => items.find((item) => item.id === id)).filter(Boolean);
   const rates = Array.isArray(box.dropRates) ? box.dropRates : [];
+  const viewBox = { ...box, prizes: pool };
   const price = Number(box.price) || 0;
   const affordable = unlimited || balance >= price;
 
@@ -57,33 +54,11 @@ export function BankCasePanel({
         </div>
       </header>
 
-      {GROUPS.map((group) => {
-        const list = pool.filter((prize) => prize.rarity === group.rarity);
-        if (list.length === 0) return null;
-        return (
-          <section key={group.rarity} className="fm-bankcase__group">
-            <div className="fm-bankcase__group-head">
-              <span className={`fm-bankcase__group-dot v2-rarity--${group.rarity}`} aria-hidden="true" />
-              <h4 className="fm-bankcase__group-title">{group.title}</h4>
-              <span className="fm-bankcase__group-count num">{list.length}</span>
-            </div>
-            <div className="fm-bankcase__grid">
-              {list.map((prize) => {
-                const rate = rates.find((entry) => entry.id === prize.id);
-                return (
-                  <div key={prize.id} className="fm-bankcase__item">
-                    <span className="fm-bankcase__card" aria-hidden="true">
-                      <BankCardArt itemId={prize.id} size={100} />
-                    </span>
-                    <span className="fm-bankcase__name">{prize.name}</span>
-                    <span className="fm-bankcase__rate num">{rate ? `${rate.rate}%` : '—'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+      <CaseRaritySections
+        box={viewBox}
+        rates={rates}
+        renderArt={(prize, size) => <BankCardArt itemId={prize.id} size={size} />}
+      />
     </article>
   );
 }
