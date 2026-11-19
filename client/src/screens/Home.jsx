@@ -1,274 +1,287 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { rub } from '../utils.js';
-import { haptic, openLink } from '../telegram.js';
-import {
-  CardsArt,
-  CoinArt,
-  BoltArt,
-  GiftArt,
-  ChestArt,
-  TrophyArt,
-  Sparkle,
-  MonogramArt,
-} from '../components/Art.jsx';
+import { shareInvite } from '../share.js';
 
-const BOT_LINK = 'https://t.me/Fartumastiibot';
-const MODE_LABEL = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
+// Пресеты входного взноса в копейках: без взноса, 100 ₽, 500 ₽, 1 000 ₽, 5 000 ₽.
+const BUYINS = [
+  { value: 0, label: 'Без взноса' },
+  { value: 10000, label: '100 ₽' },
+  { value: 50000, label: '500 ₽' },
+  { value: 100000, label: '1 000 ₽' },
+  { value: 500000, label: '5 000 ₽' },
+];
+
+const MODES = [
+  { id: 'podkidnoy', label: 'Подкидной' },
+  { id: 'perevodnoy', label: 'Переводной' },
+];
+
+const DECKS = [
+  { value: 36, label: '36 карт' },
+  { value: 52, label: '52 карты' },
+];
+
+function playersOf(room) {
+  if (Array.isArray(room?.players)) return room.players.length;
+  return Number(room?.players) || 0;
+}
+
+function modeLabel(mode) {
+  return mode === 'perevodnoy' ? 'Переводной' : 'Подкидной';
+}
 
 export function Home({ me, lobby, send, toast, inQueue, onBalance }) {
-  const [panel, setPanel] = useState(null); // 'create' | 'join' | null
-  const [seats, setSeats] = useState(2);
+  const [sheet, setSheet] = useState(null); // 'create' | 'join' | null
+  const [players, setPlayers] = useState(2);
   const [mode, setMode] = useState('podkidnoy');
-  const [joinId, setJoinId] = useState('');
+  const [buyn, setBuyn] = useState(0);
+  const [deckSize, setDeckSize] = useState(36);
+  const [code, setCode] = useState('');
 
   const rooms = lobby?.rooms || [];
-  const online = lobby?.online ?? 0;
-  const activeTables = lobby?.activeTables ?? 0;
-  const queueSize = lobby?.queueSize ?? 0;
+  const online = Number(lobby?.online) || 0;
+  const username = me?.username || '';
   const unlimited = Boolean(me?.unlimited);
 
-  function quickMatch() {
-    haptic('light');
+  const summary = useMemo(() => {
+    const stake = buyn > 0 ? rub(buyn) : 'без взноса';
+    return `${players} игрока · ${modeLabel(mode)} · ${deckSize} карт · ${stake}`;
+  }, [players, mode, buyn, deckSize]);
+
+  function play() {
     if (inQueue) {
       send({ type: 'queue:leave' });
+      toast?.('Поиск соперников отменён');
       return;
     }
     send({ type: 'queue:join' });
   }
 
-  function createRoom() {
-    haptic('medium');
-    send({ type: 'room:create', maxPlayers: seats, mode });
-    setPanel(null);
+  function createTable() {
+    send({ type: 'room:create', maxPlayers: players, mode, buyn, deckSize });
+    setSheet(null);
+    toast?.('Стол создаётся…');
   }
 
-  function joinRoom(roomId) {
-    const value = String(roomId || '').trim();
-    if (!value) {
-      toast('Введите код стола', 'error');
+  function joinByCode() {
+    const value = code.trim().toUpperCase();
+    if (value.length < 3) {
+      toast?.('Введи код стола');
       return;
     }
-    haptic('light');
-    send({ type: 'room:join', roomId: value });
-    setPanel(null);
-    setJoinId('');
+    send({ type: 'room:join', roomId: value, code: value });
+    setSheet(null);
+    setCode('');
   }
 
-  function invite() {
-    haptic('light');
-    openLink(`https://t.me/share/url?url=${encodeURIComponent(BOT_LINK)}&text=${encodeURIComponent(
-      'FARTU MASTI — играем в дурака',
-    )}`);
+  async function invite() {
+    const result = await shareInvite({ username });
+    if (result === 'clipboard') toast?.('Приглашение скопировано — открой Telegram');
+    if (result === 'cancel') toast?.('Отправка отменена');
   }
 
   return (
-    <div className="screen">
-      {/* ── Баннер ── */}
-      <section className="fm-hero">
-        <div className="fm-hero__row">
-          <span className="fm-hero__art" aria-hidden="true">
-            <CardsArt size={64} />
-          </span>
-          <div className="fm-hero__body">
-            <span className="fm-eyebrow">Онлайн-дурак</span>
-            <h1 className="fm-hero__title">FARTU MASTI</h1>
-            <p className="fm-hero__sub">Играйте с реальными людьми — без ботов</p>
-          </div>
-        </div>
-
-        <div className="fm-hero__stats">
-          <div className="fm-hero__stat">
-            <b>{online}</b>
-            <span>Онлайн</span>
-          </div>
-          <div className="fm-hero__stat">
-            <b>{activeTables}</b>
-            <span>Столов</span>
-          </div>
-          <div className="fm-hero__stat">
-            <b>{queueSize}</b>
-            <span>В поиске</span>
-          </div>
-        </div>
+    <div className="screen v2">
+      <section className="v2-hero">
+        <img className="v2-hero__art" src="/art/hero_cards.png" alt="" aria-hidden="true" />
+        <span className="v2-hero__rays" aria-hidden="true" />
+        <span className="v2-live">
+          <span className="v2-live__dot" aria-hidden="true" />
+          {online} онлайн
+        </span>
+        <h1 className="v2-hero__title">Играй в «Дурака»</h1>
+        <p className="v2-hero__sub">
+          Живые соперники, честные раздачи и стры с реальными игроками.
+        </p>
       </section>
 
-      {/* ── Играть ── */}
-      <button type="button" className="fm-cta fm-cta--hero" onClick={quickMatch}>
-        {inQueue ? 'Ищем соперников…' : 'Играть'}
-        <span className="fm-cta__tag">{inQueue ? 'выйти' : 'быстрый поиск'}</span>
+      <button
+        type="button"
+        className={`v2-cta ${inQueue ? 'v2-cta--waitting' : ''}`}
+        onClick={play}
+      >
+        <img className="v2-cta__art" src="/art/bolt.png" alt="" aria-hidden="true" />
+        <span className="v2-cta__body">
+          <span className="v2-cta__label">{inQueue ? 'Поиск соперника…' : 'Играть'}</span>
+          <span className="v2-cta__hint">
+            {inQueue ? 'Нажми, чтобы отменить' : 'Быстрый поиск соперника'}
+          </span>
+        </span>
+        <span className="v2-cta__arrow" aria-hidden="true">{inQueue ? '✕' : '›'}</span>
       </button>
 
-      {/* ── Быстрые действия ── */}
-      <div className="fm-tiles">
-        <button
-          type="button"
-          className="fm-tile"
-          onClick={() => {
-            haptic('light');
-            setPanel(panel === 'create' ? null : 'create');
-          }}
-        >
-          <span className="fm-tile__ico" aria-hidden="true">
-            <BoltArt size={22} />
-          </span>
-          <span className="fm-tile__label">Создать комнату</span>
-          <span className="fm-tile__hint">свой стол и правила</span>
+      <div className="v2-grid2">
+        <button type="button" className="v2-tile" onClick={() => setSheet('create')}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <img className="v2-tile__art" src="/art/cards_fan.png" alt="" aria-hidden="true" />
+          <span className="v2-tile__title">Создать стол</span>
+          <span className="v2-tile__sub">Взнос, колода и режим</span>
         </button>
 
-        <button
-          type="button"
-          className="fm-tile"
-          onClick={() => {
-            haptic('light');
-            setPanel(panel === 'join' ? null : 'join');
-          }}
-        >
-          <span className="fm-tile__ico" aria-hidden="true">
-            <ChestArt theme="case_table" size={24} />
-          </span>
-          <span className="fm-tile__label">Присоединиться</span>
-          <span className="fm-tile__hint">по коду стола</span>
-        </button>
-
-        <button type="button" className="fm-tile" onClick={invite}>
-          <span className="fm-tile__ico" aria-hidden="true">
-            <GiftArt size={22} />
-          </span>
-          <span className="fm-tile__label">Позвать друзей</span>
-          <span className="fm-tile__hint">ссылка в Telegram</span>
-        </button>
-
-        <button type="button" className="fm-tile" onClick={onBalance}>
-          <span className="fm-tile__ico" aria-hidden="true">
-            <CoinArt size={22} />
-          </span>
-          <span className="fm-tile__label">Баланс</span>
-          <span className="fm-tile__hint">{unlimited ? '∞ безлимит' : rub(me?.balance)}</span>
+        <button type="button" className="v2-tile v2-tile--cyan" onClick={() => setSheet('join')}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <img className="v2-tile__art" src="/art/spade.png" alt="" aria-hidden="true" />
+          <span className="v2-tile__title">Присоедниться</span>
+          <span className="v2-tile__sub">По коду стола</span>
         </button>
       </div>
 
-      {/* ── Создание комнаты ── */}
-      {panel === 'create' ? (
-        <section className="fm-panel" style={{ marginTop: 10 }}>
-          <span className="fm-eyebrow">Новый стол</span>
-          <div className="fm-field">
-            <span className="fm-field__label">Игроков за столом</span>
-            <div className="fm-chips">
-              {[2, 3, 4].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`fm-chip ${seats === value ? 'fm-chip--on' : ''}`}
-                  onClick={() => setSeats(value)}
-                >
-                  {value} игрока
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="fm-field">
-            <span className="fm-field__label">Режим</span>
-            <div className="fm-segment">
-              {['podkidnoy', 'perevodnoy'].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`fm-segment__btn ${mode === value ? 'fm-segment__btn--on' : ''}`}
-                  onClick={() => setMode(value)}
-                >
-                  {MODE_LABEL[value]}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button type="button" className="fm-cta" style={{ marginTop: 12 }} onClick={createRoom}>
-            Создать стол
-          </button>
-        </section>
-      ) : null}
+      <button type="button" className="v2-tile v2-tile--pink" onClick={invite}>
+        <span className="v2-tile__glow" aria-hidden="true" />
+        <img className="v2-tile__art" src="/art/gift.png" alt="" aria-hidden="true" />
+        <span className="v2-tile__title">Пригласить друга</span>
+        <span className="v2-tile__sub">Открыть чаты Telegram и отправить ссылку</span>
+      </button>
 
-      {/* ── Присоединение ── */}
-      {panel === 'join' ? (
-        <section className="fm-panel" style={{ marginTop: 10 }}>
-          <span className="fm-eyebrow">Вход по коду</span>
-          <label className="fm-field">
-            <span className="fm-field__label">Код или ID стола</span>
-            <span className="fm-field__box">
-              <input
-                value={joinId}
-                onChange={(event) => setJoinId(event.target.value.trim().slice(0, 24))}
-                placeholder="Например 4821"
-                inputMode="numeric"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </span>
-          </label>
-          <button
-            type="button"
-            className="fm-cta"
-            style={{ marginTop: 12 }}
-            disabled={!joinId}
-            onClick={() => joinRoom(joinId)}
-          >
-            Войти за стол
-          </button>
-        </section>
-      ) : null}
-
-      {/* ── Столы ── */}
-      <div className="fm-section">
-        <span className="fm-section__title">Доступные столы</span>
-        <span className="fm-section__hint">{rooms.length}</span>
-      </div>
-
-      {rooms.length === 0 ? (
-        <div className="empty">
-          Свободных столов нет. Нажмите «Играть» — подберём соперников, или создайте свой стол.
+      <section className="v2-panel">
+        <div className="v2-title">
+          <span>Открытые столы</span>
+          <span className="v2-chip">{rooms.length}</span>
         </div>
-      ) : (
-        <div className="fm-list">
-          {rooms.map((room) => (
-            <div key={room.id} className="fm-row">
-              <span className="fm-row__ico" aria-hidden="true">
-                <MonogramArt name={room.ownerName || '?'} size={30} />
-              </span>
-              <span className="fm-row__body">
-                <span className="fm-row__title">{room.name || `Стол ${room.code || room.id}`}</span>
-                <span className="fm-row__sub">
-                  {MODE_LABEL[room.mode] || 'Подкидной'} · {room.players}/{room.maxPlayers} ·{' '}
-                  {room.ownerName || '—'}
-                </span>
-              </span>
+
+        {rooms.length === 0 ? (
+          <div className="v2-empty">
+            Пока нет открутых столов. Создай свой — и пригласи друга.
+          </div>
+        ) : (
+          <div className="v2-stack">
+            {rooms.map((room) => (
               <button
+                key={room.id}
                 type="button"
-                className="fm-row__action"
-                disabled={room.players >= room.maxPlayers}
-                onClick={() => joinRoom(room.id)}
+                className="v2-row"
+                onClick={() => send({ type: 'room:join', roomId: room.id })}
               >
-                {room.players >= room.maxPlayers ? 'полон' : 'Войти'}
+                <img className="v2-row__art" src="/art/table.png" alt="" aria-hidden="true" />
+                <span className="v2-row__body">
+                  <span className="v2-row__name">{room.name || `Стол ${room.code || ''}`}</span>
+                  <span className="v2-row__meta">
+                    {playersOf(room)}/{room.maxPlayers || 2} · {modeLabel(room.mode)} · {room.deckSize || 36} карт
+                  </span>
+                </span>
+                <span className="v2-row__side">
+                  <span className="v2-chip v2-chip--mint">
+                    {room.buyn > 0 ? rub(room.buyn) : 'бесплатно'}
+                  </span>
+                  <span className="v2-chip">код {room.code || '—'}</span>
+                </span>
               </button>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
 
-      <div className="fm-panel fm-panel--tight" style={{ marginTop: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span aria-hidden="true">
-            <TrophyArt size={26} />
-          </span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span className="fm-row__title" style={{ display: 'block' }}>
-              Только реальные игроки
-            </span>
-            <span className="fm-row__sub" style={{ display: 'block' }}>
-              Ботов нет — соперники живые люди
-            </span>
-          </span>
-          <Sparkle size={14} />
+      {sheet === 'create' ? (
+        <div className="v2-sheet" role="dialog" aria-modal="true" aria-label="Настройки стола">
+          <div className="v2-sheet__panel">
+            <span className="v2-sheet__grab" aria-hidden="true" />
+            <div className="v2-sheet__head">
+              <span className="v2-sheet__title">Новый стол</span>
+              <button type="button" className="v2-link" onClick={() => setSheet(null)}>Закрыть</button>
+            </div>
+
+            <div className="v2-field">
+              <span className="v2-field__label">Игроки</span>
+              <div className="v2-seg">
+                {[2, 3, 4].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`v2-seg__btn ${players === count ? 'is-on' : ''}`}
+                    onClick={() => setPlayers(count)}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="v2-field">
+              <span className="v2-field__label">Режим</span>
+              <div className="v2-seg">
+                {MODES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`v2-seg__btn ${mode === item.id ? 'is-on' : ''}`}
+                    onClick={() => setMode(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="v2-field">
+              <span className="v2-field__label">Колода</span>
+              <div className="v2-seg">
+                {DECKS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={`v2-seg__btn ${deckSize === item.value ? 'is-on' : ''}`}
+                    onClick={() => setDeckSize(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="v2-field">
+              <span className="v2-field__label">Входной взнос</span>
+              <div className="v2-amounts">
+                {BUYINS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={`v2-amount ${buyn === item.value ? 'is-on' : ''}`}
+                    onClick={() => setBuyn(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="v2-summary">
+              <span className="v2-chip">{summary}</span>
+              {buyn > 0 ? <span className="v2-chip v2-chip--mint">Банк идёт победителю</span> : null}
+              {unlimited ? <span className="v2-chip v2-chip--mint">Безлимит</span> : null}
+            </div>
+
+            <button type="button" className="v2-btn v2-btn--primary" onClick={createTable}>
+              Создать стол
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
+
+      {sheet === 'join' ? (
+        <div className="v2-sheet" role="dialog" aria-modal="true" aria-label="Вход по коду">
+          <div className="v2-sheet__panel">
+            <span className="v2-sheet__grab" aria-hidden="true" />
+            <div className="v2-sheet__head">
+              <span className="v2-sheet__title">Вход по коду</span>
+              <button type="button" className="v2-link" onClick={() => setSheet(null)}>Закрыть</button>
+            </div>
+            <div className="v2-field">
+              <span className="v2-field__label">Код стола</span>
+              <input
+                className="v2-input"
+                value={code}
+                onChange={(event) => setCode(event.target.value.toUpperCase())}
+                placeholder="Например A7K2"
+                maxLength={8}
+                autoCapitalize="characters"
+              />
+            </div>
+            <button type="button" className="v2-btn v2-btn--primary" onClick={joinByCode}>
+              Войти за стол
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
