@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { rub } from '../utils.js';
 import {
@@ -9,7 +9,6 @@ import {
   EffectArt,
   CoinArt,
   CrystalArt,
-  Sparkle,
 } from '../components/Art.jsx';
 
 const TABS = [
@@ -28,8 +27,15 @@ const RARITY_LABEL = {
   mythic: 'мифический',
 };
 
-const CELL_W = 82;
-const WIN_INDEX = 6;
+const RARITY_CLASS = {
+  common: 'v2-rarity--common',
+  rare: 'v2-rarity--rare',
+  epic: 'v2-rarity--epic',
+  legendary: 'v2-rarity--legendary',
+  mythic: 'v2-rarity--mythic',
+};
+
+const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 function itemArt(item, size = 56) {
   if (!item) return <CrystalArt size={size} />;
@@ -46,7 +52,6 @@ export function Shop({ me, toast, refreshMe }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [opening, setOpening] = useState(null);
-  const reelRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -105,20 +110,18 @@ export function Shop({ me, toast, refreshMe }) {
     }
   }
 
+  // Кейс: сундук крупно в центре, медленное раскрытие, затем показ
+  // именно того предмета, который выдал сервер. Вероятности клиент не считает.
   async function openCase(box) {
     if (opening || busyId) return;
-    const width = reelRef.current?.clientWidth || 320;
-    const shift = WIN_INDEX * CELL_W + CELL_W / 2 - width / 2;
-    const pool = items.filter((item) => item.type === box.type || true);
-    const reel = Array.from({ length: 12 }).map(
-      (_, index) => pool[Math.floor(Math.random() * Math.max(1, pool.length))] || null,
-    );
-
     setBusyId(box.id);
-    setOpening({ box, phase: 'chest', reel, shift, data: null, item: null });
+    setOpening({ box, phase: 'chest', data: null, item: null });
 
-    // Сундук реагирует на нажатие, затем «раскрывается».
-    const toSpin = setTimeout(() => setOpening((prev) => (prev ? { ...prev, phase: 'spin' } : prev)), 620);
+    // Медленная фаза «зарядки» сундука — 1.5 с, затем раскрытие.
+    const toOpen = setTimeout(
+      () => setOpening((prev) => (prev ? { ...prev, phase: 'spin' } : prev)),
+      1500,
+    );
 
     try {
       const requestId = `${box.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -136,21 +139,13 @@ export function Shop({ me, toast, refreshMe }) {
           : prev,
       );
       refreshMe?.();
+      // Даём раскрытию доиграть, чтобы награда появилась после эффекта.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
       setOpening((prev) =>
-        prev
-          ? {
-              ...prev,
-              data,
-              item: data.item || found || null,
-              reel: prev.reel.map((cell, index) =>
-                index === WIN_INDEX ? data.item || found || cell : cell,
-              ),
-            }
-          : prev,
+        prev ? { ...prev, data, item: data.item || found || null, phase: 'result' } : prev,
       );
-      setTimeout(() => setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev)), 1250);
     } catch (error) {
-      clearTimeout(toSpin);
+      clearTimeout(toOpen);
       setOpening(null);
       toast(error.message, 'error');
     } finally {
@@ -165,75 +160,68 @@ export function Shop({ me, toast, refreshMe }) {
     const affordable = unlimited || balance >= item.price;
 
     return (
-      <article key={item.id} className={`fm-item ${isOwned ? 'fm-item--owned' : ''}`}>
-        <div className="fm-item__art">
-          {itemArt(item, 58)}
-          {isEquipped ? (
-            <span className="fm-rarity fm-rarity--rare" style={{ position: 'absolute', top: 7, right: 7 }}>
-              надето
-            </span>
-          ) : null}
-        </div>
-        <div className="fm-item__body">
-          <span className="fm-item__name">{item.name}</span>
-          <span className={`fm-rarity fm-rarity--${item.rarity}`}>
+      <article key={item.id} className={`v2-item ${isOwned ? 'v2-item__owned' : ''}`}>
+        <div className="v2-item__stage">
+          {itemArt(item, 64)}
+          <span className={`v2-rarity ${RARITY_CLASS[item.rarity] || 'v2-rarity--common'}`}>
             {RARITY_LABEL[item.rarity] || item.rarity}
           </span>
-          <p className="fm-item__desc">{item.desc}</p>
-          <div className="fm-item__foot">
-            <span className="fm-item__price">{item.price === 0 ? 'бесплатно' : rub(item.price)}</span>
-            {locked ? (
-              <span className="fm-rarity fm-rarity--common">скоро</span>
-            ) : isEquipped ? (
-              <span className="fm-rarity fm-rarity--rare">выбрано</span>
-            ) : isOwned ? (
-              <button
-                type="button"
-                className="fm-item__btn fm-item__btn--soft"
-                disabled={busyId === item.id}
-                onClick={() => equip(item)}
-              >
-                Применить
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="fm-item__btn"
-                disabled={busyId === item.id || !affordable}
-                onClick={() => buy(item)}
-              >
-                {busyId === item.id ? '…' : affordable ? 'Купить' : 'Мало ₽'}
-              </button>
-            )}
-          </div>
+          {isEquipped ? <span className="v2-chip v2-chip--mint">надето</span> : null}
+        </div>
+        <div className="v2-item__body">
+          <span className="v2-item__name">{item.name}</span>
+          <p className="v2-item__desc">{item.desc}</p>
+        </div>
+        <div className="v2-item__foot">
+          <span className="v2-item__price">
+            {item.price === 0 ? 'бесплатно' : rub(item.price)}
+          </span>
+          {locked ? (
+            <span className="v2-chip">скоро</span>
+          ) : isEquipped ? (
+            <span className="v2-chip v2-chip--mint">выбрано</span>
+          ) : isOwned ? (
+            <button
+              type="button"
+              className="v2-btn"
+              disabled={busyId === item.id}
+              onClick={() => equip(item)}
+            >
+              Применить
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="v2-btn v2-btn--primary"
+              disabled={busyId === item.id || !affordable}
+              onClick={() => buy(item)}
+            >
+              {busyId === item.id ? '…' : affordable ? 'Купить' : 'Мало ₽'}
+            </button>
+          )}
         </div>
       </article>
     );
   }
 
   const winRarity = opening?.data?.rarity || opening?.item?.rarity || 'common';
+  const chestOpen = opening?.phase === 'spin' || opening?.phase === 'result';
 
   return (
-    <div className="screen">
-      <div className="fm-section">
-        <div>
-          <span className="fm-eyebrow">Витрина</span>
-          <h2 className="fm-title">Магазин</h2>
-        </div>
-        <span className="fm-section__hint" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <CoinArt size={16} />
-          {unlimited ? '∞' : rub(balance)}
-        </span>
+    <div className="screen v2">
+      <div className="v2-title">
+        <span>Магазин</span>
+        <span className="v2-chip v2-chip--mint">{unlimited ? '∞' : rub(balance)}</span>
       </div>
 
-      <div className="fm-tabs" role="tablist">
+      <div className="v2-tabs" role="tablist">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
             aria-selected={tab === item.id}
-            className={`fm-chip ${tab === item.id ? 'fm-chip--on' : ''}`}
+            className={`v2-tab ${tab === item.id ? 'is-on' : ''}`}
             onClick={() => setTab(item.id)}
           >
             {item.label}
@@ -242,178 +230,165 @@ export function Shop({ me, toast, refreshMe }) {
       </div>
 
       {loading ? (
-        <div className="fm-shop-grid">
+        <div className="v2-shop-grid">
           {[0, 1, 2, 3].map((index) => (
-            <div key={index} className="skeleton" style={{ height: 200, borderRadius: 20 }} />
+            <div key={index} className="skeleton" style={{ height: 208, borderRadius: 22 }} />
           ))}
         </div>
       ) : tab === 'cases' ? (
         <>
-          <p className="fm-sub" style={{ margin: '0 2px 10px' }}>
+          <p className="v2-hint">
             Кейсы открываются за виртуальные рубли. Шансы рассчитывает сервер — анимация на них не влияет.
           </p>
-          <div className="fm-case-grid">
+
+          <div className="v2-shop-grid">
             {cases.map((box) => (
-              <article key={box.id} className="fm-case">
-                <div className="fm-case__art">
-                  <ChestArt theme={box.id} size={118} />
-                  <Sparkle size={12} tone="#8be6ff" />
+              <article key={box.id} className="v2-case-card">
+                <div className="v2-case-card__chest">
+                  <ChestArt theme={box.id} size={150} />
                 </div>
-                <div className="fm-case__body">
-                  <span className="fm-case__name">{box.name}</span>
-                  <p className="fm-case__desc">{box.desc}</p>
-                  <div className="fm-case__odds">
+                <div className="v2-case-card__body">
+                  <span className="v2-case-card__title">{box.name}</span>
+                  <p className="v2-case-card__sub">{box.desc}</p>
+                  <div className="v2-case-card__odds">
                     {Object.entries(box.odds || {}).map(([rarity, chance]) => (
-                      <span key={rarity} className={`fm-rarity fm-rarity--${rarity}`}>
+                      <span
+                        key={rarity}
+                        className={`v2-rarity ${RARITY_CLASS[rarity] || 'v2-rarity--common'}`}
+                      >
                         {RARITY_LABEL[rarity] || rarity} {chance}%
                       </span>
                     ))}
                   </div>
-                  <div className="fm-case__foot">
-                    <span className="fm-case__price">{rub(box.price)}</span>
-                    <button
-                      type="button"
-                      className="fm-item__btn"
-                      disabled={Boolean(opening) || (!unlimited && balance < box.price)}
-                      onClick={() => openCase(box)}
-                    >
-                      Открыть
-                    </button>
-                  </div>
+                </div>
+                <div className="v2-case-card__foot">
+                  <span className="v2-case-card__price">{rub(box.price)}</span>
+                  <button
+                    type="button"
+                    className="v2-btn v2-btn--primary"
+                    disabled={Boolean(opening) || (!unlimited && balance < box.price)}
+                    onClick={() => openCase(box)}
+                  >
+                    Открыть
+                  </button>
                 </div>
               </article>
             ))}
           </div>
 
-          <div className="fm-section">
-            <span className="fm-section__title">История открытий</span>
-            <span className="fm-section__hint">{(catalog?.caseHistory || []).length}</span>
-          </div>
-          {(catalog?.caseHistory || []).length === 0 ? (
-            <div className="empty">Пока нет открытых кейсов.</div>
-          ) : (
-            <div className="fm-list">
-              {(catalog?.caseHistory || []).slice(0, 20).map((row) => (
-                <div key={row.id || row.openingId} className="fm-row">
-                  <span className="fm-row__ico" aria-hidden="true">
-                    <ChestArt theme={row.caseId} size={22} />
-                  </span>
-                  <span className="fm-row__body">
-                    <span className="fm-row__title">{row.itemName || row.name || 'Возврат за дубликат'}</span>
-                    <span className="fm-row__sub">{row.caseName || row.caseId || 'Кейс'}</span>
-                  </span>
-                  <span className="fm-row__value">{row.refund ? `+${rub(row.refund)}` : ''}</span>
-                </div>
-              ))}
+          <section className="v2-panel">
+            <div className="v2-title">
+              <span>История открытий</span>
+              <span className="v2-chip">{(catalog?.caseHistory || []).length}</span>
             </div>
-          )}
+            {(catalog?.caseHistory || []).length === 0 ? (
+              <div className="v2-empty">Пока нет открытых кейсов.</div>
+            ) : (
+              <div className="v2-stack">
+                {(catalog?.caseHistory || []).slice(0, 20).map((row) => (
+                  <div key={row.id || row.openingId} className="v2-row">
+                    <span className="v2-row__art" aria-hidden="true">
+                      <ChestArt theme={row.caseId} size={26} />
+                    </span>
+                    <span className="v2-row__body">
+                      <span className="v2-row__name">
+                        {row.itemName || row.name || 'Возврат за дубликат'}
+                      </span>
+                      <span className="v2-row__meta">{row.caseName || row.caseId || 'Кейс'}</span>
+                    </span>
+                    <span className="v2-row__side">
+                      {row.refund ? `+${rub(row.refund)}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </>
       ) : (
         <>
-          <p className="fm-sub" style={{ margin: '0 2px 10px' }}>
+          <p className="v2-hint">
             {lockedTypes.includes(tab)
               ? 'Покупка этого раздела появится позже — предпросмотр уже доступен.'
               : 'Косметика применяется сразу и сохраняется в профиле.'}
           </p>
-          <div className="fm-shop-grid">{visible.map(renderItem)}</div>
+          <div className="v2-shop-grid">{visible.map(renderItem)}</div>
         </>
       )}
 
       {opening ? (
         <div
-          className="fm-modal"
+          className="v2-opener"
           role="dialog"
           aria-modal="true"
           onClick={() => (opening.phase === 'result' ? setOpening(null) : null)}
         >
-          <div className="fm-modal__sheet" onClick={(event) => event.stopPropagation()}>
-            <span className="fm-modal__grip" aria-hidden="true" />
-            <div className="fm-modal__head">
-              <div>
-                <span className="fm-eyebrow">Кейс</span>
-                <h3 className="fm-modal__title">{opening.box.name}</h3>
-              </div>
+          <span className="v2-opener__rays" aria-hidden="true" />
+
+          {opening.phase !== 'result' ? (
+            <div className="v2-opener__stage">
+              <span className="v2-opener__halo" aria-hidden="true" />
+              <span
+                className={`v2-opener__chest ${opening.phase === 'chest' ? 'is-charging' : ''} ${
+                  opening.phase === 'spin' ? 'is-open' : ''
+                }`}
+              >
+                <ChestArt theme={opening.box.id} size={300} open={chestOpen} />
+              </span>
+              {opening.phase === 'spin' ? (
+                <span className="v2-opener__sparks" aria-hidden="true">
+                  {SPARKS.map((index) => (
+                    <span key={index} />
+                  ))}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {opening.phase === 'result' ? (
+            <div className="v2-opener__reward">
+              <span className="v2-opener__reward-art">
+                {opening.data?.refund ? <CoinArt size={104} /> : itemArt(opening.item, 104)}
+              </span>
+              {opening.data?.refund ? (
+                <>
+                  <span className="v2-opener__reward-name">Дубликат</span>
+                  <p className="v2-opener__hint">
+                    Все предметы кейса уже собраны. Возврат {rub(opening.data.refund)}.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="v2-opener__reward-name">
+                    {opening.item?.name || 'Предмет получен'}
+                  </span>
+                  <span className={`v2-opener__reward-rarity v2-rarity ${RARITY_CLASS[winRarity] || ''}`}>
+                    {RARITY_LABEL[winRarity] || 'обычный'}
+                  </span>
+                  {opening.item?.desc ? (
+                    <p className="v2-opener__hint">{opening.item.desc}</p>
+                  ) : null}
+                </>
+              )}
               <button
                 type="button"
-                className="fm-iconbtn"
-                aria-label="Закрыть"
+                className="v2-btn v2-btn--primary"
                 onClick={() => setOpening(null)}
-                disabled={opening.phase !== 'result'}
               >
-                ✕
+                Забрать
               </button>
             </div>
-
-            <div className="fm-opener">
-              {opening.phase === 'chest' || opening.phase === 'spin' ? (
-                <div className="fm-opener__stage">
-                  <span
-                    className={`fm-opener__burst ${opening.phase === 'spin' ? 'fm-opener__burst--on' : ''}`}
-                    aria-hidden="true"
-                  />
-                  <span
-                    className={`fm-opener__chest ${opening.phase === 'chest' ? 'fm-opener__chest--shake' : ''} ${
-                      opening.phase === 'spin' ? 'fm-opener__chest--opened' : ''
-                    }`}
-                  >
-                    <ChestArt theme={opening.box.id} size={128} open={opening.phase === 'spin'} />
-                  </span>
-                </div>
-              ) : null}
-
-              {opening.phase === 'spin' ? (
-                <div className="fm-reel" ref={reelRef}>
-                  <div
-                    className="fm-reel__track fm-reel__track--run"
-                    style={{ '--fm-reel-shift': `-${opening.shift}px` }}
-                  >
-                    {opening.reel.map((cell, index) => (
-                      <span
-                        key={index}
-                        className={`fm-reel__cell ${index === WIN_INDEX ? 'fm-reel__cell--win' : ''}`}
-                      >
-                        {itemArt(cell, 46)}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="fm-reel__pointer" aria-hidden="true" />
-                </div>
-              ) : null}
-
-              {opening.phase === 'result' ? (
-                <div className="fm-reward">
-                  <span className="fm-reward__art">
-                    {opening.data?.refund ? <CoinArt size={58} /> : itemArt(opening.item, 62)}
-                  </span>
-                  {opening.data?.refund ? (
-                    <>
-                      <span className="fm-reward__name">Дубликат</span>
-                      <p className="fm-reward__sub">
-                        Все предметы кейса уже собраны. Возврат {rub(opening.data.refund)}.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <span className="fm-reward__name">{opening.item?.name || 'Предмет получен'}</span>
-                      <span className={`fm-rarity fm-rarity--${winRarity}`}>
-                        {RARITY_LABEL[winRarity] || 'обычный'}
-                      </span>
-                      {opening.item?.desc ? <p className="fm-reward__sub">{opening.item.desc}</p> : null}
-                    </>
-                  )}
-                  <button type="button" className="fm-cta" onClick={() => setOpening(null)}>
-                    Забрать
-                  </button>
-                </div>
-              ) : null}
-
-              {opening.phase !== 'result' ? (
-                <p className="fm-note" style={{ textAlign: 'center' }}>
-                  Открываем кейс…
-                </p>
-              ) : null}
-            </div>
-          </div>
+          ) : (
+            <>
+              <h3 className="v2-opener__title">{opening.box.name}</h3>
+              <p className="v2-opener__hint">
+                {opening.phase === 'chest' ? 'Кейс заряжается…' : 'Открываем…'}
+              </p>
+              <div className="v2-opener__progress" aria-hidden="true">
+                <span />
+              </div>
+            </>
+          )}
         </div>
       ) : null}
     </div>

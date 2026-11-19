@@ -5,6 +5,7 @@ import './styles.css';
 import './game.css';
 import './premium.css';
 import './design.css';
+import './shop.css';
 
 const container = document.getElementById('root');
 createRoot(container).render(
