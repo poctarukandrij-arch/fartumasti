@@ -109,6 +109,62 @@ function bootstrapUnlimited() {
   if (keys.length) console.log('[unlimited] безлимит закреплён:', keys.join(', '));
 }
 
+/**
+ * Повторная привязка безлимита не чаще раза в 3 секунды.
+ * Нужна потому, что аккаунты создаются после старта сервера, а имя задают ещё позже:
+ * одноразовая привязка на входе иначе не срабатывает.
+ */
+let lastUnlimitedSync = 0;
+function syncUnlimited() {
+  const now = Date.now();
+  if (now - lastUnlimitedSync < 3000) return;
+  lastUnlimitedSync = now;
+  try {
+    bootstrapUnlimited();
+  } catch (error) {
+    console.warn('[unlimited] привязка не выполнена:', error.message);
+  }
+}
+
+/** Рейтинг: сортировка по победам, затем по проценту побед и числу партий. */
+function leaderboardPayload(userId, limit = 50) {
+  const rows = db.all(
+    `SELECT id, username, balance, games_played, wins, losses, unlimited, updated_at
+       FROM users
+      WHERE username IS NOT NULL AND COALESCE(banned, 0) = 0
+      ORDER BY wins DESC, games_played ASC, updated_at ASC`,
+  );
+  const ranked = rows.map((row, index) => {
+    const played = row.games_played || 0;
+    const wins = row.wins || 0;
+    const user = db.get('SELECT * FROM users WHERE id = ?', [row.id]);
+    let emoji = null;
+    try {
+      emoji = user ? shop.equippedOf(user)?.emoji || null : null;
+    } catch {
+      emoji = null;
+    }
+    return {
+      rank: index + 1,
+      userId: row.id,
+      name: row.username,
+      emoji,
+      wins,
+      losses: row.losses || 0,
+      gamesPlayed: played,
+      winRate: played > 0 ? Math.round((wins / played) * 100) : 0,
+      unlimited: Boolean(row.unlimited),
+      isMe: row.id === userId,
+    };
+  });
+  const me = ranked.find((entry) => entry.userId === userId) || null;
+  return {
+    total: ranked.length,
+    top: ranked.slice(0, Math.min(Math.max(Number(limit) || 50, 1), 100)),
+    me,
+  };
+}
+
 function userStats(user) {
   const played = user.games_played || 0;
   const wins = user.wins || 0;
@@ -307,6 +363,7 @@ export async function buildServer() {
 
   app.get('/api/me', requireAuth, (req, res) => {
     try {
+      syncUnlimited();
       res.json(mePayload(getUserById(req.user.id)));
     } catch (error) {
       mapError(res, error);
@@ -444,6 +501,14 @@ export async function buildServer() {
         transactions: listTransactions(user.id, 50),
         purchases: listPurchases(user.id, 50),
       });
+    } catch (error) {
+      mapError(res, error);
+    }
+  });
+
+  app.get('/api/leaderboard', requireAuth, (req, res) => {
+    try {
+      res.json(leaderboardPayload(req.user.id, Number(req.query.limit) || 50));
     } catch (error) {
       mapError(res, error);
     }
@@ -750,6 +815,8 @@ export async function buildServer() {
             rooms.createRoom(currentUser, {
               maxPlayers: Number(message.maxPlayers) || 2,
               mode: message.mode === 'perevodnoy' ? 'perevodnoy' : 'podkidnoy',
+              buyIn: Math.trunc(Number(message.buyIn) || 0),
+              deckSize: Number(message.deckSize) === 52 ? 52 : 36,
             });
             break;
           case 'room:join':
