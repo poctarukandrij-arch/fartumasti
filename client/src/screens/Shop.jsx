@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { rub } from '../utils.js';
 import {
@@ -11,12 +11,13 @@ import {
   CrystalArt,
 } from '../components/Art.jsx';
 
-const TABS = [
-  { id: 'deck', label: 'Колоды' },
-  { id: 'table', label: 'Столы' },
-  { id: 'emoji', label: 'Эмодзи' },
-  { id: 'effect', label: 'Эффекты' },
-  { id: 'cases', label: 'Кейсы' },
+// Категории магазина: у каждой своя 3D-иллюстрация и понятное назначение.
+const CATS = [
+  { id: 'cases', label: 'Кейсы', sub: 'Награды и рулетка' },
+  { id: 'deck', label: 'Колоды', sub: 'Стиль карт' },
+  { id: 'table', label: 'Столы', sub: 'Оформление стола' },
+  { id: 'emoji', label: 'Эмодзи', sub: 'Знак у ника' },
+  { id: 'effect', label: 'Эффекты', sub: 'Появление за столом' },
 ];
 
 const RARITY_LABEL = {
@@ -27,15 +28,17 @@ const RARITY_LABEL = {
   mythic: 'мифический',
 };
 
-const RARITY_CLASS = {
-  common: 'v2-rarity--common',
-  rare: 'v2-rarity--rare',
-  epic: 'v2-rarity--epic',
-  legendary: 'v2-rarity--legendary',
-  mythic: 'v2-rarity--mythic',
-};
-
 const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+// Рулетка кейса: фиксированный шаг ячейки, победитель всегда встаёт по центру.
+const CELL = 92;
+const GAP = 10;
+const STEP = CELL + GAP;
+const STRIP = 44;
+const WIN_INDEX = 36;
+const SPIN_MS = 6400;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function itemArt(item, size = 56) {
   if (!item) return <CrystalArt size={size} />;
@@ -46,12 +49,33 @@ function itemArt(item, size = 56) {
   return <CrystalArt size={size} />;
 }
 
+function catArt(id, size = 40) {
+  if (id === 'cases') return <ChestArt theme="case_bank" size={size + 12} />;
+  if (id === 'deck') return <DeckArt itemId="deck_neon" size={size} />;
+  if (id === 'table') return <TableArt itemId="table_aurora" size={size} />;
+  if (id === 'emoji') return <EmojiArt id="emoji_fire" size={size} />;
+  return <EffectArt id="effect_phoenix" size={size} />;
+}
+
+// Лента рулетки собирается только из реальных предметов кейса (box.prizes).
+// Выигрыш подставляет сервер, поэтому лента всегда останавливается на нём.
+function buildStrip(box, winnerId) {
+  const pool = Array.isArray(box?.prizes) && box.prizes.length ? box.prizes : [];
+  if (pool.length === 0) return [];
+  const cells = Array.from({ length: STRIP }, () => pool[Math.floor(Math.random() * pool.length)]);
+  const winner = pool.find((entry) => entry.id === winnerId) || pool[0];
+  cells[WIN_INDEX] = winner;
+  return cells;
+}
+
 export function Shop({ me, toast, refreshMe }) {
-  const [tab, setTab] = useState('deck');
+  const [cat, setCat] = useState('cases');
   const [catalog, setCatalog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [opening, setOpening] = useState(null);
+  const [offset, setOffset] = useState(0);
+  const viewportRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -68,6 +92,23 @@ export function Shop({ me, toast, refreshMe }) {
     };
   }, [toast]);
 
+  // Запуск движения рулетки: считаем смещение так, чтобы победная ячейка
+  // оказалась точно по центру экрана.
+  useEffect(() => {
+    if (opening?.phase !== 'spin') return undefined;
+    const width = viewportRef.current?.clientWidth || 360;
+    const target = WIN_INDEX * STEP + CELL / 2 - width / 2;
+    setOffset(0);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setOffset(target));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [opening?.phase]);
+
   const items = catalog?.items || [];
   const cases = catalog?.cases || [];
   const owned = useMemo(() => new Set(catalog?.owned || []), [catalog]);
@@ -76,7 +117,7 @@ export function Shop({ me, toast, refreshMe }) {
   const unlimited = Boolean(catalog?.unlimited ?? me?.unlimited);
   const balance = catalog?.balance ?? me?.balance ?? 0;
 
-  const visible = items.filter((item) => item.type === tab);
+  const visible = items.filter((item) => item.type === cat);
 
   async function buy(item) {
     if (busyId) return;
@@ -102,7 +143,7 @@ export function Shop({ me, toast, refreshMe }) {
       const data = await api('/shop/equip', { method: 'POST', body: { itemId: item.id } });
       setCatalog((prev) => (prev ? { ...prev, equipped: data.equipped || prev.equipped } : prev));
       refreshMe?.();
-      toast(`Применено: ${item.name}`, 'success');
+      toast(`Надето: ${item.name}`, 'success');
     } catch (error) {
       toast(error.message, 'error');
     } finally {
@@ -110,25 +151,18 @@ export function Shop({ me, toast, refreshMe }) {
     }
   }
 
-  // Кейс: сундук крупно в центре, медленное раскрытие, затем показ
-  // именно того предмета, который выдал сервер. Вероятности клиент не считает.
+  // Кейс: сундук заряжается, затем медленная рулетка и показ именно той
+  // награды, которую вернул сервер. Клиент не выбирает предмет.
   async function openCase(box) {
     if (opening || busyId) return;
     setBusyId(box.id);
-    setOpening({ box, phase: 'chest', data: null, item: null });
-
-    // Медленная фаза «зарядки» сундука — 1.5 с, затем раскрытие.
-    // Переводим в «spin» только пока сундук ещё заряжается: иначе таймер
-    // может сработать уже после ответа сервера и откатить показ награды.
-    const toOpen = setTimeout(
-      () => setOpening((prev) => (prev && prev.phase === 'chest' ? { ...prev, phase: 'spin' } : prev)),
-      1500,
-    );
+    setOpening({ box, phase: 'charge', strip: [], data: null, item: null });
 
     try {
+      const started = Date.now();
       const requestId = `${box.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const data = await api('/shop/case', { method: 'POST', body: { caseId: box.id, requestId } });
-      const found = items.find((item) => item.id === (data.itemId || data.item?.id));
+
       setCatalog((prev) =>
         prev
           ? {
@@ -141,14 +175,16 @@ export function Shop({ me, toast, refreshMe }) {
           : prev,
       );
       refreshMe?.();
-      // Даём раскрытию доиграть, чтобы награда появилась после эффекта.
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      clearTimeout(toOpen);
-      setOpening((prev) =>
-        prev ? { ...prev, data, item: data.item || found || null, phase: 'result' } : prev,
-      );
+
+      // Даём сундуку «зарядиться», даже если сервер ответил мгновенно.
+      await sleep(Math.max(0, 1100 - (Date.now() - started)));
+
+      const strip = buildStrip(box, data.item?.id);
+      setOpening({ box, phase: 'spin', strip, data, item: data.item || null });
+
+      await sleep(SPIN_MS + 300);
+      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));
     } catch (error) {
-      clearTimeout(toOpen);
       setOpening(null);
       toast(error.message, 'error');
     } finally {
@@ -166,7 +202,7 @@ export function Shop({ me, toast, refreshMe }) {
       <article key={item.id} className={`v2-item ${isOwned ? 'v2-item__owned' : ''}`}>
         <div className="v2-item__stage">
           {itemArt(item, 64)}
-          <span className={`v2-rarity ${RARITY_CLASS[item.rarity] || 'v2-rarity--common'}`}>
+          <span className={`v2-rarity v2-rarity--${item.rarity || 'common'}`}>
             {RARITY_LABEL[item.rarity] || item.rarity}
           </span>
           {isEquipped ? <span className="v2-chip v2-chip--mint">надето</span> : null}
@@ -190,7 +226,7 @@ export function Shop({ me, toast, refreshMe }) {
               disabled={busyId === item.id}
               onClick={() => equip(item)}
             >
-              Применить
+              Надеть
             </button>
           ) : (
             <button
@@ -208,26 +244,29 @@ export function Shop({ me, toast, refreshMe }) {
   }
 
   const winRarity = opening?.data?.rarity || opening?.item?.rarity || 'common';
-  const chestOpen = opening?.phase === 'spin' || opening?.phase === 'result';
+  const isResult = opening?.phase === 'result';
+  const isSpin = opening?.phase === 'spin';
 
   return (
-    <div className="screen v2">
+    <div className="screen v2 v3-shop">
       <div className="v2-title">
         <span>Магазин</span>
         <span className="v2-chip v2-chip--mint">{unlimited ? '∞' : rub(balance)}</span>
       </div>
 
-      <div className="v2-tabs" role="tablist">
-        {TABS.map((item) => (
+      <div className="v3-catbar" role="tablist" aria-label="Категории магазина">
+        {CATS.map((entry) => (
           <button
-            key={item.id}
+            key={entry.id}
             type="button"
             role="tab"
-            aria-selected={tab === item.id}
-            className={`v2-tab ${tab === item.id ? 'is-on' : ''}`}
-            onClick={() => setTab(item.id)}
+            aria-selected={cat === entry.id}
+            className={`v3-cat ${cat === entry.id ? 'is-on' : ''}`}
+            onClick={() => setCat(entry.id)}
           >
-            {item.label}
+            <span className="v3-cat__art" aria-hidden="true">{catArt(entry.id, 38)}</span>
+            <span className="v3-cat__label">{entry.label}</span>
+            <span className="v3-cat__sub">{entry.sub}</span>
           </button>
         ))}
       </div>
@@ -238,34 +277,42 @@ export function Shop({ me, toast, refreshMe }) {
             <div key={index} className="skeleton" style={{ height: 208, borderRadius: 22 }} />
           ))}
         </div>
-      ) : tab === 'cases' ? (
+      ) : cat === 'cases' ? (
         <>
           <p className="v2-hint">
-            Кейсы открываются за виртуальные рубли. Шансы рассчитывает сервер — анимация на них не влияет.
+            Кейсы открываются за виртуальные рубли. Шансы считает сервер — анимация на них не влияет.
           </p>
 
-          <div className="v2-shop-grid">
+          <div className="v3-case-grid">
             {cases.map((box) => (
-              <article key={box.id} className="v2-case-card">
-                <div className="v2-case-card__chest">
-                  <ChestArt theme={box.id} size={150} />
+              <article key={box.id} className="v3-case">
+                <div className="v3-case__stage">
+                  <span className="v3-case__halo" aria-hidden="true" />
+                  <ChestArt theme={box.id} size={132} />
                 </div>
-                <div className="v2-case-card__body">
-                  <span className="v2-case-card__title">{box.name}</span>
-                  <p className="v2-case-card__sub">{box.desc}</p>
-                  <div className="v2-case-card__odds">
+                <div className="v3-case__body">
+                  <span className="v3-case__title">{box.name}</span>
+                  <p className="v3-case__sub">{box.desc}</p>
+                  <div className="v3-case__odds">
                     {Object.entries(box.odds || {}).map(([rarity, chance]) => (
-                      <span
-                        key={rarity}
-                        className={`v2-rarity ${RARITY_CLASS[rarity] || 'v2-rarity--common'}`}
-                      >
+                      <span key={rarity} className={`v2-rarity v2-rarity--${rarity}`}>
                         {RARITY_LABEL[rarity] || rarity} {chance}%
                       </span>
                     ))}
                   </div>
+                  <div className="v3-case__pool">
+                    {(box.prizes || []).slice(0, 4).map((prize) => (
+                      <span key={prize.id} className="v3-case__pool-art" aria-hidden="true">
+                        {itemArt(prize, 30)}
+                      </span>
+                    ))}
+                    {(box.prizes || []).length > 4 ? (
+                      <span className="v3-case__pool-more">+{(box.prizes || []).length - 4}</span>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="v2-case-card__foot">
-                  <span className="v2-case-card__price">{rub(box.price)}</span>
+                <div className="v3-case__foot">
+                  <span className="v3-case__price">{rub(box.price)}</span>
                   <button
                     type="button"
                     className="v2-btn v2-btn--primary"
@@ -289,13 +336,13 @@ export function Shop({ me, toast, refreshMe }) {
             ) : (
               <div className="v2-stack">
                 {(catalog?.caseHistory || []).slice(0, 20).map((row) => (
-                  <div key={row.id || row.openingId} className="v2-row">
+                  <div key={row.openingId || row.id} className="v2-row">
                     <span className="v2-row__art" aria-hidden="true">
                       <ChestArt theme={row.caseId} size={26} />
                     </span>
                     <span className="v2-row__body">
                       <span className="v2-row__name">
-                        {row.itemName || row.name || 'Возврат за дубликат'}
+                        {row.item?.name || row.itemName || 'Возврат за дубликат'}
                       </span>
                       <span className="v2-row__meta">{row.caseName || row.caseId || 'Кейс'}</span>
                     </span>
@@ -311,8 +358,8 @@ export function Shop({ me, toast, refreshMe }) {
       ) : (
         <>
           <p className="v2-hint">
-            {lockedTypes.includes(tab)
-              ? 'Покупка этого раздела появится позже — предпросмотр уже доступен.'
+            {lockedTypes.includes(cat)
+              ? 'Покупка этого раздела появится позже — предпросмотр уже доступен, а предметы этого типа выпадают из кейсов.'
               : 'Косметика применяется сразу и сохраняется в профиле.'}
           </p>
           <div className="v2-shop-grid">{visible.map(renderItem)}</div>
@@ -320,77 +367,82 @@ export function Shop({ me, toast, refreshMe }) {
       )}
 
       {opening ? (
-        <div
-          className="v2-opener"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => (opening.phase === 'result' ? setOpening(null) : null)}
-        >
-          <span className="v2-opener__rays" aria-hidden="true" />
+        <div className="v3-scene" role="dialog" aria-modal="true" aria-label={opening.box.name}>
+          <span className="v3-scene__rays" aria-hidden="true" />
+          <span className="v3-scene__glow" aria-hidden="true" />
 
-          {opening.phase !== 'result' ? (
-            <div className="v2-opener__stage">
-              <span className="v2-opener__halo" aria-hidden="true" />
-              <span
-                className={`v2-opener__chest ${opening.phase === 'chest' ? 'is-charging' : ''} ${
-                  opening.phase === 'spin' ? 'is-open' : ''
-                }`}
-              >
-                <ChestArt theme={opening.box.id} size={300} open={chestOpen} />
+          <div className="v3-scene__head">
+            <span className="v3-scene__title">{opening.box.name}</span>
+            <span className="v3-scene__state">
+              {isResult ? 'Награда получена' : isSpin ? 'Рулетка крутится…' : 'Сундук открывается…'}
+            </span>
+          </div>
+
+          <div className="v3-scene__stage">
+            <span
+              className={`v3-scene__chest ${opening.phase === 'charge' ? 'is-charging' : ''} ${
+                isSpin || isResult ? 'is-open' : ''
+              }`}
+            >
+              <ChestArt theme={opening.box.id} size={isResult ? 168 : 224} open={isSpin || isResult} />
+            </span>
+            {isSpin ? (
+              <span className="v3-scene__sparks" aria-hidden="true">
+                {SPARKS.map((index) => <span key={index} />)}
               </span>
-              {opening.phase === 'spin' ? (
-                <span className="v2-opener__sparks" aria-hidden="true">
-                  {SPARKS.map((index) => (
-                    <span key={index} />
-                  ))}
-                </span>
-              ) : null}
+            ) : null}
+          </div>
+
+          {isSpin ? (
+            <div className="v3-roulette" ref={viewportRef}>
+              <span className="v3-roulette__marker" aria-hidden="true" />
+              <div
+                className="v3-roulette__track"
+                style={{ transform: `translate3d(${-offset}px, 0, 0)` }}
+              >
+                {opening.strip.map((prize, index) => (
+                  <div
+                    key={`${prize?.id || 'cell'}-${index}`}
+                    className={`v3-roulette__cell ${index === WIN_INDEX ? 'is-win' : ''}`}
+                    style={{ width: CELL, marginRight: GAP }}
+                  >
+                    <span className="v3-roulette__art" aria-hidden="true">{itemArt(prize, 52)}</span>
+                    <span className="v3-roulette__name">{prize?.name || '—'}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
 
-          {opening.phase === 'result' ? (
-            <div className="v2-opener__reward">
-              <span className="v2-opener__reward-art">
-                {opening.data?.refund ? <CoinArt size={104} /> : itemArt(opening.item, 104)}
+          {isResult ? (
+            <div className="v3-reward">
+              <span className={`v3-reward__art v3-reward--${winRarity}`}>
+                {opening.data?.refund ? <CoinArt size={96} /> : itemArt(opening.item, 96)}
               </span>
               {opening.data?.refund ? (
                 <>
-                  <span className="v2-opener__reward-name">Дубликат</span>
-                  <p className="v2-opener__hint">
+                  <span className="v3-reward__name">Дубликат</span>
+                  <p className="v3-reward__hint">
                     Все предметы кейса уже собраны. Возврат {rub(opening.data.refund)}.
                   </p>
                 </>
               ) : (
                 <>
-                  <span className="v2-opener__reward-name">
-                    {opening.item?.name || 'Предмет получен'}
-                  </span>
-                  <span className={`v2-opener__reward-rarity v2-rarity ${RARITY_CLASS[winRarity] || ''}`}>
+                  <span className="v3-reward__name">{opening.item?.name || 'Предмет получен'}</span>
+                  <span className={`v3-reward__rarity v2-rarity v2-rarity--${winRarity}`}>
                     {RARITY_LABEL[winRarity] || 'обычный'}
                   </span>
-                  {opening.item?.desc ? (
-                    <p className="v2-opener__hint">{opening.item.desc}</p>
-                  ) : null}
+                  {opening.item?.desc ? <p className="v3-reward__hint">{opening.item.desc}</p> : null}
                 </>
               )}
-              <button
-                type="button"
-                className="v2-btn v2-btn--primary"
-                onClick={() => setOpening(null)}
-              >
+              <button type="button" className="v2-btn v2-btn--primary" onClick={() => setOpening(null)}>
                 Забрать
               </button>
             </div>
           ) : (
-            <>
-              <h3 className="v2-opener__title">{opening.box.name}</h3>
-              <p className="v2-opener__hint">
-                {opening.phase === 'chest' ? 'Кейс заряжается…' : 'Открываем…'}
-              </p>
-              <div className="v2-opener__progress" aria-hidden="true">
-                <span />
-              </div>
-            </>
+            <p className="v3-scene__hint">
+              {opening.phase === 'charge' ? 'Кейс заряжается…' : 'Награду определяет сервер'}
+            </p>
           )}
         </div>
       ) : null}
