@@ -14,6 +14,10 @@ function audioContext() {
   }
 }
 
+// Единый активный звук прокрутки: новый запуск глушит предыдущий,
+// поэтому экземпляры не накладываются друг на друга.
+let activeSpin = null;
+
 function blip(ctx, at, freq, gainValue, duration) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -33,6 +37,7 @@ function blip(ctx, at, freq, gainValue, duration) {
  * @param {number} totalTicks сколько тиков успеть
  */
 export function playCaseSpin(durationMs = 6400, totalTicks = 46) {
+  if (typeof activeSpin === 'function') activeSpin();
   const ctx = audioContext();
   if (!ctx) return () => {};
 
@@ -62,13 +67,16 @@ export function playCaseSpin(durationMs = 6400, totalTicks = 46) {
   drone.start(start);
   drone.stop(start + seconds + 0.1);
 
-  return () => {
+  const stop = () => {
+    if (activeSpin === stop) activeSpin = null;
     try {
       ctx.close();
     } catch {
       /* контекст уже закрыт */
     }
   };
+  activeSpin = stop;
+  return stop;
 }
 
 /** Победный аккорд в момент показа награды. */

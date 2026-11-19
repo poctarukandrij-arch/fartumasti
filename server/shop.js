@@ -81,15 +81,8 @@ export const ITEMS = [
 ];
 
 export const CASES = [
-  {
-    id: 'case_bank',
-    name: 'Кейс банковской карты',
-    desc: 'Колоды в стиле российских банковских карт. Без логотипов и брендов.',
-    price: 14900,
-    types: ['deck'],
-    pool: ['deck_card_steel', 'deck_card_signal', 'deck_card_titan', 'deck_card_black', 'deck_steel', 'deck_neon', 'deck_crimson', 'deck_void'],
-    odds: { common: 52, rare: 30, epic: 14, legendary: 4 },
-  },
+  // Единственный кейс банковских карт. Старый пустой дубль case_bank удалён,
+  // чтобы в магазине была одна точка входа «Банковские карты».
   {
     id: 'case_bankcards',
     name: 'Банковские карты',
