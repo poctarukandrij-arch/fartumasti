@@ -48,10 +48,6 @@ export function EmblemArt({ size = 132, className = '' }) {
         </filter>
       </defs>
 
-      {/* мягкое свечение позади герба */}
-      <circle cx="80" cy="74" r="74" fill={`url(#${id('halo')})`} opacity="0.9" />
-      <ellipse cx="80" cy="140" rx="46" ry="8" fill="#0a0418" opacity="0.55" filter={`url(#${id('soft')})`} />
-
       {/* лучи */}
       <g opacity="0.28" stroke={`url(#${id('rim')})`} strokeWidth="1.4" strokeLinecap="round">
         <path d="M80 6v12" />
