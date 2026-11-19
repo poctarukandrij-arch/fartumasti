@@ -483,5 +483,8 @@ export function Shop({ me, toast, refreshMe }) {
           Вероятности заданы на сервере и не зависят от анимации. Награду всегда определяет сервер.
         </p>
       </Sheet>
+    </div>
+  );
+}
 
 export default Shop;
