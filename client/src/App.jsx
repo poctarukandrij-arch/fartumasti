@@ -15,6 +15,7 @@ import Profile from './screens/Profile.jsx';
 import Withdraw from './screens/Withdraw.jsx';
 import Inventory from './screens/Inventory.jsx';
 import Rules from './screens/Rules.jsx';
+import Support from './screens/Support.jsx';
 import TableScreen from './screens/Table.jsx';
 
 const TABS = [
@@ -77,6 +78,13 @@ export default function App() {
   const socketRef = useRef(null);
   const autoRetryRef = useRef(0);
   const voiceRef = useRef(null);
+
+  useEffect(() => {
+    // Смена раздела или оверлея всегда возвращает страницу наверх:
+    // кнопки больше не оставляют пользователя в середине экрана.
+    window.scrollTo(0, 0);
+    document.querySelector('.app__main')?.scrollTo(0, 0);
+  }, [tab, overlay]);
 
   const toast = useCallback((message, kind = 'info') => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -342,7 +350,7 @@ export default function App() {
     );
   }
 
-  if (overlay === 'withdraw' || overlay === 'inventory' || overlay === 'rules') {
+  if (overlay === 'withdraw' || overlay === 'inventory' || overlay === 'rules' || overlay === 'support') {
     return (
       <div className="app">
         <div className="app__bg" aria-hidden="true" />
@@ -353,6 +361,7 @@ export default function App() {
             <Inventory onBack={() => setOverlay(null)} toast={toast} refreshMe={refreshMe} />
           ) : null}
           {overlay === 'rules' ? <Rules onBack={() => setOverlay(null)} /> : null}
+          {overlay === 'support' ? <Support onBack={() => setOverlay(null)} toast={toast} /> : null}
         </main>
         <BalanceModal
           open={balanceOpen}
@@ -397,6 +406,7 @@ export default function App() {
                 inQueue={inQueue}
                 onRules={() => setOverlay('rules')}
                 onInventory={() => setOverlay('inventory')}
+                onSupport={() => setOverlay('support')}
                 onBalance={() => setBalanceOpen(true)}
               />
             ) : null}

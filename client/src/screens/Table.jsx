@@ -135,6 +135,8 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
     setMuted(new Set(voice.muted || []));
   }
 
+  const allMuted = peers.length > 0 && muted.size >= peers.length;
+
   function cardPlayable(cardId) {
     if (!canAct) return false;
     return attackIds.has(cardId) || transferIds.has(cardId) || (legal.defend || []).some((o) => o.cardId === cardId);
@@ -237,7 +239,7 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
                 <span key={player.userId} className={`seat-dot ${player.connected ? 'seat-dot--on' : ''}`}>
                   <PlayerTag
                     name={player.username}
-                    emoji={player.equipped?.emojis || player.emojis}
+                    emoji={player.emoji || player.equipped?.emojis || player.emojis}
                     size={12}
                   />
                   {player.ready ? ' ✓' : ''}
@@ -410,31 +412,62 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
       </div>
 
       {showVoice ? (
-        <div className="voice-panel">
-          <div className="voice-bar">
+        <div className="voice-panel fm-voice">
+          <div className="fm-voice__head">
+            <span className="fm-voice__title">Голос стола</span>
             <button
               type="button"
-              className={`mic ${micOn ? 'mic--on' : ''}`}
-              onClick={toggleMic}
-              aria-pressed={micOn}
+              className="chat__close"
+              onClick={() => setShowVoice(false)}
+              aria-label="Закрыть голосовую панель"
             >
-              {micOn ? 'Микрофон включён' : 'Включить микрофон'}
-            </button>
-            <button type="button" className="voice-chip" onClick={muteAll}>
-              {muted.size >= peers.length && peers.length > 0 ? 'Включить всех' : 'Заглушить всех'}
+              ✕
             </button>
           </div>
+
+          <div className="fm-voice__stage">
+            <button
+              type="button"
+              className={`fm-mic ${micOn ? 'is-on' : ''}`}
+              onClick={toggleMic}
+              aria-pressed={micOn}
+              aria-label={micOn ? 'Выключить микрофон' : 'Включить микрофон'}
+            >
+              <span className="fm-mic__pulse" aria-hidden="true" />
+              <span className="fm-mic__glyph" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                </svg>
+              </span>
+              <span className="fm-mic__label">{micOn ? 'Микрофон включён' : 'Включить микрофон'}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`fm-voice__mute ${allMuted ? 'is-on' : ''}`}
+              onClick={muteAll}
+              disabled={peers.length === 0}
+            >
+              {allMuted ? 'Включить всех' : 'Заглушить всех'}
+            </button>
+          </div>
+
+          <p className="fm-voice__note">
+            {micOn ? 'Вас слышат игроки за столом.' : 'Микрофон выключен — вас не слышно.'}
+          </p>
+
           {peers.length === 0 ? (
-            <p className="muted small">В комнате пока нет других игроков.</p>
+            <p className="fm-voice__empty">В комнате пока нет других игроков.</p>
           ) : (
             (room.players || [])
               .filter((player) => player.userId !== myId)
               .map((player) => (
-                <div key={player.userId} className="voice-row">
+                <div key={player.userId} className="voice-row fm-voice__row">
                   <span className="voice-row__name">
                     <PlayerTag
                       name={player.username}
-                      emoji={player.equipped?.emojis || player.emojis}
+                      emoji={player.emoji || player.equipped?.emojis || player.emojis}
                       size={13}
                     />
                     {player.mic ? <span className="voice-chip voice-chip--live">говорит</span> : null}
