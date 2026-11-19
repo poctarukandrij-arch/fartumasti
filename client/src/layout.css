@@ -891,8 +891,8 @@ input[type='number'] {
 .fm-emblem {
   width: 152px;
   margin-left: auto;
-  margin-right: -4px;
-  transform: translateX(3px);
+  margin-right: -2px;
+  transform: translateX(2px);
   animation: none !important;
   filter: none !important;
   box-shadow: none !important;
@@ -1186,4 +1186,18 @@ button,
 .nav__item {
   box-shadow: none !important;
   filter: none !important;
+}
+
+/* 13.7 Один уровень полей: отступ даёт только оболочка .app__main.
+   .screen больше не добавляет свои 16px, поэтому контент занимает
+   всю доступную ширину, а эмблема выровнена по правому краю контента. */
+.screen,
+.v3-home,
+.v2.v3-home,
+.v3-shop,
+.v2.v3-shop,
+.fm-screen,
+.v3-screen {
+  padding-left: 0;
+  padding-right: 0;
 }
