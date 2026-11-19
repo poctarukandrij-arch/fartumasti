@@ -5,6 +5,7 @@ import { PlayerTag } from '../components/PlayerTag.jsx';
 import Chat from '../components/Chat.jsx';
 import { deckClassOf, tableClassOf } from '../catalog.js';
 import { suitSymbol } from '../utils.js';
+import { shareInvite } from '../share.js';
 
 const SUIT_NAME = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
 
@@ -53,15 +54,36 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
 
   const peers = (room?.players || []).filter((player) => player.userId !== myId).map((player) => player.userId);
 
+  const inviteCode = room?.inviteCode || '';
+  const isPrivate = room?.visibility === 'private';
+
   function copyCode() {
-    const code = room?.code || room?.id;
+    const code = isPrivate && inviteCode ? inviteCode : room?.code || room?.id;
     if (!code) return;
     try {
       navigator.clipboard?.writeText(code);
-      toast('Код комнаты скопирован', 'success');
+      toast(isPrivate ? 'Код приглашения скопирован' : 'Код стола скопирован', 'success');
     } catch {
-      toast(`Код комнаты: ${code}`);
+      toast(`Код стола: ${code}`);
     }
+  }
+
+  function copyInviteLink() {
+    const code = isPrivate && inviteCode ? inviteCode : room?.code || room?.id;
+    if (!code) return;
+    const link = `${window.location.origin}/?start=${code}`;
+    try {
+      navigator.clipboard?.writeText(link);
+      toast('Ссылка-приглашение скопирована', 'success');
+    } catch {
+      toast(`Код приглашения: ${code}`);
+    }
+  }
+
+  function invitePlayer() {
+    const code = isPrivate && inviteCode ? inviteCode : room?.code || room?.id;
+    if (!code) return;
+    shareInvite({ code, username: user.username || '' });
   }
 
   function playAttack() {
@@ -165,7 +187,7 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
           <span className="chip chip--pulse">{secondsLeft} с</span>
         ) : (
           <button type="button" className="chip" onClick={copyCode}>
-            {room.code || room.id}
+            {isPrivate && inviteCode ? inviteCode : room.code || room.id}
           </button>
         )}
         <button
@@ -210,9 +232,23 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
               {room.players.length} / {room.maxPlayers} игроков
             </span>
             <p className="muted small center" style={{ margin: 0 }}>
-              Код комнаты <b>{room.code || room.id}</b> — отправьте другу. Ботов за столом нет.
+              {isPrivate ? (
+                <>
+                  Приватный стол. Код приглашения <b>{inviteCode}</b> — войти можно только по нему.
+                </>
+              ) : (
+                <>
+                  Открытый стол. Код <b>{room.code || room.id}</b> — отправьте другу. Ботов за столом нет.
+                </>
+              )}
             </p>
             <div className="table-actions">
+              <button type="button" className="btn btn--soft btn--sm" onClick={invitePlayer}>
+                Пригласить игрока
+              </button>
+              <button type="button" className="btn btn--soft btn--sm" onClick={copyInviteLink}>
+                Скопировать приглашение
+              </button>
               <button type="button" className="btn btn--soft btn--sm" onClick={copyCode}>
                 Скопировать код
               </button>
