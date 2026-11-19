@@ -13,6 +13,8 @@ import Shop from './screens/Shop.jsx';
 import Stats from './screens/Stats.jsx';
 import Profile from './screens/Profile.jsx';
 import Withdraw from './screens/Withdraw.jsx';
+import Inventory from './screens/Inventory.jsx';
+import Rules from './screens/Rules.jsx';
 import TableScreen from './screens/Table.jsx';
 
 const TABS = [
@@ -340,13 +342,17 @@ export default function App() {
     );
   }
 
-  if (overlay === 'withdraw') {
+  if (overlay === 'withdraw' || overlay === 'inventory' || overlay === 'rules') {
     return (
       <div className="app">
         <div className="app__bg" aria-hidden="true" />
         <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} />
         <main className="app__main">
-          <Withdraw me={me.user} onBack={() => setOverlay(null)} />
+          {overlay === 'withdraw' ? <Withdraw me={me.user} onBack={() => setOverlay(null)} /> : null}
+          {overlay === 'inventory' ? (
+            <Inventory onBack={() => setOverlay(null)} toast={toast} refreshMe={refreshMe} />
+          ) : null}
+          {overlay === 'rules' ? <Rules onBack={() => setOverlay(null)} /> : null}
         </main>
         <BalanceModal
           open={balanceOpen}
@@ -378,6 +384,7 @@ export default function App() {
             toast={toast}
             onLeave={leaveRoom}
             onRefreshMe={refreshMe}
+            onRules={() => setOverlay('rules')}
           />
         ) : (
           <div className="screen" key={tab}>
@@ -388,6 +395,8 @@ export default function App() {
                 send={send}
                 toast={toast}
                 inQueue={inQueue}
+                onRules={() => setOverlay('rules')}
+                onInventory={() => setOverlay('inventory')}
                 onBalance={() => setBalanceOpen(true)}
               />
             ) : null}
@@ -399,6 +408,7 @@ export default function App() {
                 stats={me.stats}
                 onLogout={logout}
                 onWithdraw={() => setBalanceOpen(true)}
+                onInventory={() => setOverlay('inventory')}
                 refreshMe={refreshMe}
                 toast={toast}
               />
