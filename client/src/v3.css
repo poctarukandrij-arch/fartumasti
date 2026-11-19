@@ -24,6 +24,7 @@ body,
   left: 0;
   right: 0;
   margin-inline: auto;
+  transform: none;
   justify-content: center;
   align-items: center;
   padding-left: max(12px, env(safe-area-inset-left));
