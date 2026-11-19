@@ -5,7 +5,7 @@ import { createGame, applyAction, publicState, handlePlayerLeft, autoAction, Gam
 import { db } from '../db.js';
 import { checkMessage, sanitizeMessage } from '../filter.js';
 import { equippedOf } from '../shop.js';
-import { credit, debit } from '../wallet.js';
+import { credit, debit, balanceOf, isUnlimited } from '../wallet.js';
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const DISCONNECT_GRACE_MS = 90 * 1000;
