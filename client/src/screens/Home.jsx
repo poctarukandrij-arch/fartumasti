@@ -3,6 +3,7 @@ import { rub } from '../utils.js';
 import { shareInvite } from '../share.js';
 import { Sheet } from '../components/Sheet.jsx';
 import { BoltArt, CardsArt, TableArt, GiftArt, CrystalArt, StarArt } from '../components/Art.jsx';
+import { EmblemArt } from '../components/Emblem.jsx';
 
 const MODES = [
   { id: 'podkidnoy', label: 'Подкидной' },
@@ -89,8 +90,10 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
     <div className="v2 v3-home">
       <section className="v2-hero v3-hero">
         <span className="v2-hero__rays" aria-hidden="true" />
-        <span className="fm-tiger__glow" aria-hidden="true" />
-        <img className="fm-tiger" src="/art/tiger.png" alt="" aria-hidden="true" />
+        <span className="fm-emblem__glow" aria-hidden="true" />
+        <span className="fm-emblem" aria-hidden="true">
+          <EmblemArt size={126} />
+        </span>
         <span className="v2-live">
           <span className="v2-live__dot" aria-hidden="true" />
           {online} онлайн

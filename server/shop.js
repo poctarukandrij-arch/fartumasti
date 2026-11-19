@@ -42,6 +42,20 @@ export const ITEMS = [
   { id: 'deck_card_signal', type: 'deck', name: 'Карта «Сигнал»', rarity: 'rare', price: 6900, desc: 'Синий градиент и тонкая полоса чипа.', visual: { back: '#132033', edge: '#3f6ea8', accent: '#5b9bff', cardStyle: true } },
   { id: 'deck_card_titan', type: 'deck', name: 'Карта «Титан»', rarity: 'epic', price: 9900, desc: 'Тяжёлый титан с рельефным номером.', visual: { back: '#1a1d24', edge: '#8e96a8', accent: '#dfe6f0', cardStyle: true } },
   { id: 'deck_card_black', type: 'deck', name: 'Карта «Чёрная»', rarity: 'legendary', price: 19900, desc: 'Закрытая премиальная карта без логотипов.', visual: { back: '#07080b', edge: '#3a3f4b', accent: '#ff4d6d', cardStyle: true } },
+  // --- Коллекционные банковские карты (кейс «Банковские карты») ---
+  // Легендарные: три самых редких карты.
+  { id: 'bank_sber', type: 'deck', name: 'Сбер', rarity: 'legendary', price: 24900, desc: 'Зелёная премиальная карта Сбера с фирменным знаком.', visual: { back: '#0b5f2a', edge: '#21a038', accent: '#8ef0b0', bank: 'sber', cardStyle: true } },
+  { id: 'bank_tbank', type: 'deck', name: 'Т-Банк', rarity: 'legendary', price: 24900, desc: 'Жёлтая карта Т-Банка с чёрным щитом.', visual: { back: '#3a3000', edge: '#ffdd2d', accent: '#fff3a8', bank: 'tbank', cardStyle: true } },
+  { id: 'bank_alfa', type: 'deck', name: 'Альфа-Банк', rarity: 'legendary', price: 24900, desc: 'Красная карта Альфа-Банка с фирменной «А».', visual: { back: '#5c0a05', edge: '#ef3124', accent: '#ffb0a8', bank: 'alfa', cardStyle: true } },
+  // Средняя редкость.
+  { id: 'bank_ozon', type: 'deck', name: 'Ozon Банк', rarity: 'rare', price: 12900, desc: 'Сине-фиолетовая карта Ozon Банка.', visual: { back: '#0a1e4d', edge: '#005bff', accent: '#9ec5ff', bank: 'ozon', cardStyle: true } },
+  { id: 'bank_uralsib', type: 'deck', name: 'Уралсиб', rarity: 'rare', price: 12900, desc: 'Синяя карта Уралсиба с оранжевым акцентом.', visual: { back: '#062a5c', edge: '#0b4da2', accent: '#ff8a3d', bank: 'uralsib', cardStyle: true } },
+  { id: 'bank_wb', type: 'deck', name: 'WB Банк', rarity: 'rare', price: 12900, desc: 'Фиолетово-розовая карта WB Банка.', visual: { back: '#4a0a63', edge: '#cb11ab', accent: '#ff8ee0', bank: 'wb', cardStyle: true } },
+  { id: 'bank_raif', type: 'deck', name: 'Райффайзен', rarity: 'rare', price: 12900, desc: 'Жёлто-чёрная карта Райффайзена.', visual: { back: '#3d3500', edge: '#fee600', accent: '#fff9a8', bank: 'raif', cardStyle: true } },
+  // Обычная редкость.
+  { id: 'bank_otp', type: 'deck', name: 'ОТП Банк', rarity: 'common', price: 6900, desc: 'Зелёная карта ОТП Банка.', visual: { back: '#04391d', edge: '#009b48', accent: '#9df0bd', bank: 'otp', cardStyle: true } },
+  { id: 'bank_sovcom', type: 'deck', name: 'Совкомбанк', rarity: 'common', price: 6900, desc: 'Тёмно-синяя карта Совкомбанка.', visual: { back: '#04143a', edge: '#0a2973', accent: '#7fb2ff', bank: 'sovcom', cardStyle: true } },
+  { id: 'bank_mts', type: 'deck', name: 'МТС Банк', rarity: 'common', price: 6900, desc: 'Красная карта МТС Банка.', visual: { back: '#4d0207', edge: '#e30611', accent: '#ffb3b7', bank: 'mts', cardStyle: true } },
   // --- Оформление столов ---
   { id: 'table_graphite', type: 'table', name: 'Графит', rarity: 'common', price: 0, desc: 'Базовое оформление стола: тёмный графит.', visual: { felt: ['#15171c', '#0e1013'], line: '#2a2f38' } },
   { id: 'table_emerald', type: 'table', name: 'Изумруд', rarity: 'rare', price: 4900, desc: 'Глубокий зелёный фетр с мягкой подсветкой.', visual: { felt: ['#0e2019', '#08130f'], line: '#1f7a58' } },
@@ -75,6 +89,26 @@ export const CASES = [
     types: ['deck'],
     pool: ['deck_card_steel', 'deck_card_signal', 'deck_card_titan', 'deck_card_black', 'deck_steel', 'deck_neon', 'deck_crimson', 'deck_void'],
     odds: { common: 52, rare: 30, epic: 14, legendary: 4 },
+  },
+  {
+    id: 'case_bankcards',
+    name: 'Банковские карты',
+    desc: 'Коллекционные карты банков: обычные, средние и самые редкие.',
+    price: 19900,
+    types: ['deck'],
+    pool: [
+      'bank_sber',
+      'bank_tbank',
+      'bank_alfa',
+      'bank_ozon',
+      'bank_uralsib',
+      'bank_wb',
+      'bank_raif',
+      'bank_otp',
+      'bank_sovcom',
+      'bank_mts',
+    ],
+    odds: { common: 62, rare: 32, legendary: 6 },
   },
   {
     id: 'case_table',
