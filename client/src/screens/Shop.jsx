@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { rub } from '../utils.js';
 import { Sheet } from '../components/Sheet.jsx';
+import { CaseScene } from '../components/CaseScene.jsx';
+import { BankCardArt, BankCaseArt, bankOf } from '../components/BankCard.jsx';
 import { playCaseSpin, playCaseWin } from '../sfx.js';
 import {
   ChestArt,
@@ -44,6 +46,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function itemArt(item, size = 56) {
   if (!item) return <CrystalArt size={size} />;
+  if (bankOf(item.id)) return <BankCardArt itemId={item.id} size={Math.round(size * 1.6)} />;
   if (item.type === 'deck') return <DeckArt itemId={item.id} size={size} />;
   if (item.type === 'table') return <TableArt itemId={item.id} size={size} />;
   if (item.type === 'emoji') return <EmojiArt id={item.id} size={size} />;
@@ -290,7 +293,11 @@ export function Shop({ me, toast, refreshMe }) {
               <article key={box.id} className="v3-case">
                 <div className="v3-case__stage">
                   <span className="v3-case__halo" aria-hidden="true" />
-                  <ChestArt theme={box.id} size={132} />
+                  {box.id === 'case_bankcards' ? (
+                    <BankCaseArt size={132} />
+                  ) : (
+                    <ChestArt theme={box.id} size={132} />
+                  )}
                 </div>
                 <div className="v3-case__body">
                   <span className="v3-case__title">{box.name}</span>
@@ -375,8 +382,9 @@ export function Shop({ me, toast, refreshMe }) {
         </>
       )}
 
-      {opening ? (
-        <div className="v3-scene" role="dialog" aria-modal="true" aria-label={opening.box.name}>
+      <CaseScene open={Boolean(opening)} label={opening?.box?.name || 'Открытие кейса'}>
+        {opening ? (
+        <div className="v3-scene">
           <span className="v3-scene__rays" aria-hidden="true" />
           <span className="v3-scene__glow" aria-hidden="true" />
 
@@ -454,7 +462,8 @@ export function Shop({ me, toast, refreshMe }) {
             </p>
           )}
         </div>
-      ) : null}
+        ) : null}
+      </CaseScene>
 
       <Sheet
         open={Boolean(ratesBox)}

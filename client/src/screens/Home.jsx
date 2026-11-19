@@ -91,15 +91,17 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
       <section className="v2-hero v3-hero">
         <span className="v2-hero__rays" aria-hidden="true" />
         <span className="fm-emblem__glow" aria-hidden="true" />
+        <div className="v3-hero__text">
+          <span className="v2-live">
+            <span className="v2-live__dot" aria-hidden="true" />
+            {online} онлайн
+          </span>
+          <h1 className="v2-hero__title v3-hero__title">Играй в «Дурака»</h1>
+          <p className="v2-hero__sub v3-hero__sub">Живые соперники и честные раздачи.</p>
+        </div>
         <span className="fm-emblem" aria-hidden="true">
-          <EmblemArt size={126} />
+          <EmblemArt size={112} />
         </span>
-        <span className="v2-live">
-          <span className="v2-live__dot" aria-hidden="true" />
-          {online} онлайн
-        </span>
-        <h1 className="v2-hero__title v3-hero__title">Играй в «Дурака»</h1>
-        <p className="v2-hero__sub v3-hero__sub">Живые соперники и честные раздачи.</p>
       </section>
 
       <button type="button" className={`v2-cta ${inQueue ? 'v2-cta--waiting' : ''}`} onClick={play}>

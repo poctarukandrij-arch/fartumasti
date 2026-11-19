@@ -419,45 +419,10 @@ body.no-scroll {
 }
 
 /* Тигр: вырезанный персонаж, стоит справа и «светится» из сцены */
-.fm-tiger {
-  position: absolute;
-  right: -14px;
-  bottom: -26px;
-  width: 58%;
-  max-width: 232px;
-  height: auto;
-  pointer-events: none;
-  user-select: none;
-  filter: drop-shadow(0 16px 26px rgba(4, 0, 12, 0.65)) saturate(1.05);
-  animation: fm-tiger-float 6s ease-in-out infinite;
-}
 
-.fm-tiger__glow {
-  position: absolute;
-  right: -6%;
-  bottom: -18%;
-  width: 74%;
-  height: 68%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 209, 102, 0.42), rgba(255, 77, 141, 0.18) 45%, transparent 70%);
-  filter: blur(16px);
-  pointer-events: none;
-}
 
-@keyframes fm-tiger-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-7px) rotate(1deg);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .fm-tiger {
-    animation: none;
-  }
 }
 
 .v3-hero__title {
@@ -2349,10 +2314,6 @@ body.no-scroll {
     font-size: 17px;
   }
 
-  .fm-tiger {
-    width: 54%;
-    bottom: -22px;
-  }
 }
 
 @media (max-height: 700px) {

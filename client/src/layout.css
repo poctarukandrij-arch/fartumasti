@@ -1,0 +1,399 @@
+/* ============================================================================
+   FARTU MASTI — полноэкранный макет, фирменный знак, сцена кейса, банковские карты.
+   Подключается последним слоем: снимает узкие контейнеры, чинит переносы,
+   фиксирует сцену кейса по центру видимой области.
+   ========================================================================== */
+
+/* ── 1. Полный вьюпорт: убираем боковые пустоты ─────────────────────────── */
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+}
+
+.app {
+  width: 100%;
+  max-width: 100%;
+}
+
+.app__main,
+.app__main--room {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+}
+
+.app__main {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+}
+
+.app__main--room {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(8px, env(safe-area-inset-right, 0px));
+}
+
+.screen,
+.v2,
+.v3-home,
+.v3-shop {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  min-width: 0;
+}
+
+/* ── 2. Главный экран: герб вместо тигра ────────────────────────────────── */
+
+.v3-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.v3-hero__text {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.v3-hero > .v2-hero__rays,
+.v3-hero > .fm-emblem__glow {
+  position: absolute;
+  pointer-events: none;
+}
+
+.fm-emblem__glow {
+  top: 50%;
+  right: -18px;
+  width: 170px;
+  height: 170px;
+  margin-top: -85px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(168, 85, 247, 0.55), rgba(59, 232, 255, 0.2) 55%, transparent 74%);
+  filter: blur(16px);
+  z-index: 1;
+}
+
+.fm-emblem {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: block;
+  width: 112px;
+  animation: fm-emblem-float 7s ease-in-out infinite;
+  filter: drop-shadow(0 12px 26px rgba(124, 58, 237, 0.45));
+}
+
+.fm-emblem svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes fm-emblem-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0);
+  }
+}
+
+@media (max-width: 359px) {
+  .fm-emblem {
+    width: 84px;
+  }
+  .fm-emblem__glow {
+    width: 132px;
+    height: 132px;
+    margin-top: -66px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-emblem {
+    animation: none;
+  }
+}
+
+/* ── 3. Переносы и переполнения ─────────────────────────────────────────── */
+
+.v2-title,
+.v3-catbar,
+.v2-panel,
+.v2-stack,
+.v2-shop-grid,
+.v3-case-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.v3-catbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.v3-catbar::-webkit-scrollbar {
+  display: none;
+}
+
+.v3-cat {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.v2-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.v2-shop-grid > * {
+  min-width: 0;
+}
+
+.v2-row__name,
+.v2-row__meta,
+.fm-rates__name,
+.v2-empty,
+.v2-hint {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.v2-row__name,
+.v2-row__meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-btn,
+.v2-chip,
+.fm-cta,
+.v3-case__rates {
+  max-width: 100%;
+}
+
+.fm-rates__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fm-rates__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fm-rates__value {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.fm-fineprint {
+  overflow-wrap: anywhere;
+}
+
+/* ── 4. Карточки кейсов: подписи не наезжают друг на друга ──────────────── */
+
+.v3-case-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 430px) {
+  .v3-case-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.v3-case {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.v3-case__stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 128px;
+}
+
+.v3-case__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.v3-case__title {
+  display: block;
+  font-size: 15px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.v3-case__sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  min-height: calc(2 * 1.35em);
+}
+
+.v3-case__odds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.v3-case__odds .v2-rarity {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.v3-case__pool {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.v3-case__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.v3-case__price {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v3-case__rates,
+.v3-case__foot .v2-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ── 5. Сцена кейса: портал, центр вьюпорта, блокировка фона ────────────── */
+
+.fm-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px
+    calc(env(safe-area-inset-bottom, 0px) + 8px);
+  overscroll-behavior: contain;
+}
+
+.fm-scene__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(80% 55% at 50% 18%, rgba(124, 58, 237, 0.5), transparent 66%),
+    radial-gradient(70% 50% at 50% 92%, rgba(255, 77, 141, 0.22), transparent 70%),
+    rgba(4, 1, 12, 0.92);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.fm-scene__inner {
+  position: relative;
+  width: 100%;
+  max-width: 470px;
+  max-height: 100%;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.fm-scene .v3-scene {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 26px;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65);
+  animation: fm-scene-in 0.32s cubic-bezier(0.22, 0.8, 0.28, 1) both;
+}
+
+@keyframes fm-scene-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-scene .v3-scene {
+    animation: none;
+  }
+}
+
+/* ── 6. Коллекционные банковские карты ─────────────────────────────────── */
+
+.fm-bankcard {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  filter: drop-shadow(0 10px 20px rgba(3, 0, 10, 0.55));
+}
+
+.v3-case__pool-art .fm-bankcard,
+.v3-roulette__art .fm-bankcard,
+.fm-rates__art .fm-bankcard {
+  filter: drop-shadow(0 4px 8px rgba(3, 0, 10, 0.5));
+}
