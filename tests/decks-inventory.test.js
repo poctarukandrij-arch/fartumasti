@@ -74,7 +74,11 @@ test('некорректный размер колоды приводится к
 });
 
 test('партия на 24 картах раздаётся только из младших девятошных карт', () => {
-  const state = durak.createGame(['a', 'b'], Math.random, { mode: 'podkidnoy', deckSize: 24 });
+  const state = durak.createGame(
+    [{ userId: 'a', name: 'A' }, { userId: 'b', name: 'B' }],
+    Math.random,
+    { mode: 'podkidnoy', deckSize: 24 },
+  );
   const all = [...state.players.flatMap((player) => player.hand), ...state.deck];
   if (state.trumpCard) all.push(state.trumpCard);
   assert.equal(all.length, 24);
@@ -84,7 +88,11 @@ test('партия на 24 картах раздаётся только из м�
 });
 
 test('партия на 52 картах отдаёт игрокам выбранную колоду', () => {
-  const state = durak.createGame(['a', 'b', 'c'], Math.random, { mode: 'podkidnoy', deckSize: 52 });
+  const state = durak.createGame(
+    [{ userId: 'a', name: 'A' }, { userId: 'b', name: 'B' }, { userId: 'c', name: 'C' }],
+    Math.random,
+    { mode: 'podkidnoy', deckSize: 52 },
+  );
   const all = [...state.players.flatMap((player) => player.hand), ...state.deck];
   if (state.trumpCard) all.push(state.trumpCard);
   assert.equal(all.length, 52);
@@ -93,7 +101,11 @@ test('партия на 52 картах отдаёт игрокам выбран
 });
 
 test('партия на 36 картах остаётся классической', () => {
-  const state = durak.createGame(['a', 'b'], Math.random, { mode: 'podkidnoy', deckSize: 36 });
+  const state = durak.createGame(
+    [{ userId: 'a', name: 'A' }, { userId: 'b', name: 'B' }],
+    Math.random,
+    { mode: 'podkidnoy', deckSize: 36 },
+  );
   const all = [...state.players.flatMap((player) => player.hand), ...state.deck];
   if (state.trumpCard) all.push(state.trumpCard);
   assert.equal(all.length, 36);
@@ -121,7 +133,7 @@ test('надеть некупленный предмет нельзя', () => {
 
 test('награда кейса попадает во владение игрока', () => {
   const user = createUser(0);
-  wallet.credit(user.id, 500000, 'test_topup', null, 'пополнение для теста');
+  wallet.credit(user.id, 500000, 'test_topup', 'пополнение для теста');
   const box = shop.CASES[0];
   const result = shop.openCase(user.id, box.id, () => 0.999);
   assert.ok(box.pool.includes(result.item.id));
@@ -131,9 +143,9 @@ test('награда кейса попадает во владение игро�
 
 test('надетый предмет переживает повторный вход', () => {
   const user = createUser(100000);
-  shop.buyItem(user.id, 'emoji_crown');
-  shop.equipItem(user.id, 'emoji_crown');
+  shop.buyItem(user.id, 'emoji_rocket');
+  shop.equipItem(user.id, 'emoji_rocket');
   const again = db.get('SELECT * FROM users WHERE id = ?', [user.id]);
-  assert.equal(shop.equippedOf(again).emoji, 'emoji_crown');
-  assert.ok([...shop.ownedItemIds(user.id)].includes('emoji_crown'));
+  assert.equal(shop.equippedOf(again).emoji, 'emoji_rocket');
+  assert.ok([...shop.ownedItemIds(user.id)].includes('emoji_rocket'));
 });
