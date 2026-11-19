@@ -61,12 +61,18 @@ try {
     } catch { /* тело уже прочитано */ }
   });
 
+  const consoleErrors = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+
   await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+  // Панель тестового входа появляется после ожидания initData (~6 c).
   await page.waitForSelector('#dev-id', { timeout: 25000 });
   await page.fill('#dev-id', 'archi');
   await page.fill('#dev-name', 'Archi');
-  await page.click('.panel.col .btn--primary');
-  await page.waitForSelector('.topbar', { timeout: 15000 });
+  await page.getByRole('button', { name: 'Войти в тестовом режиме' }).click();
+  await page.waitForSelector('.bottomnav', { timeout: 20000 });
 
   await page.getByRole('button', { name: 'Магазин', exact: true }).click();
   await page.getByRole('tab', { name: 'Кейсы' }).click();
@@ -81,6 +87,7 @@ try {
   if (!serverAward) fail('не удалось прочитать награду из ответа сервера');
   else if (shown !== serverAward) fail(`на экране «${shown}», сервер выдал «${serverAward}»`);
   if (pageErrors.length) fail(`ошибки страницы: ${pageErrors.join(' | ')}`);
+  if (consoleErrors.length) console.warn(`консоль: ${consoleErrors.slice(0, 3).join(' | ')}`);
 
   if (!process.exitCode) {
     await page.getByRole('button', { name: 'Забрать' }).click();
@@ -89,6 +96,15 @@ try {
   }
 } catch (error) {
   fail(error.message);
+  if (browser) {
+    const pages = browser.contexts().flatMap((ctx) => ctx.pages());
+    for (const p of pages) {
+      try {
+        const text = (await p.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
+        console.error(`ЭКРАН: ${text}`);
+      } catch { /* страница уже закрыта */ }
+    }
+  }
 } finally {
   await browser?.close().catch(() => {});
   server.kill();
