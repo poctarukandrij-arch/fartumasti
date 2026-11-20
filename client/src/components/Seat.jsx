@@ -1,4 +1,4 @@
-import { emojiOf } from '../catalog.js';
+import { Emoji3D } from './Items3D.jsx';
 import { Avatar } from './Avatar.jsx';
 
 // Место игрока за овальным столом: аватар, имя, число карт и статус хода.
@@ -10,7 +10,7 @@ export function Seat({ player, slot = 'top', isMe, isTurn, deckClass, waiting = 
   if (player.connected === false) classes.push('seat--offline');
 
   const cards = Math.max(0, Number(player.cards) || 0);
-  const emoji = emojiOf(player.equipped?.emoji);
+  const emoji = player.equipped?.emoji && player.equipped.emoji !== 'emoji_none' ? player.equipped.emoji : '';
   const name = player.name || player.username || 'Игрок';
   const fan = Math.min(cards, 4);
 
@@ -30,7 +30,7 @@ export function Seat({ player, slot = 'top', isMe, isTurn, deckClass, waiting = 
       </span>
       <span className="seat__plate">
         <span className="seat__name">
-          {emoji ? <span className="seat__emoji" aria-hidden="true">{emoji}</span> : null}
+          {emoji ? <span className="seat__emoji" aria-hidden="true"><Emoji3D id={emoji} size={22} /></span> : null}
           {name}
         </span>
         <span className="seat__meta">

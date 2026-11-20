@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CoinArt, SbpMark, Sparkle } from './Art.jsx';
+import { SbpMark, Sparkle } from './Art.jsx';
+import { RefIcon } from './RefIcon.jsx';
 import { haptic } from '../telegram.js';
 
 const PRESETS = [500, 1000, 2500, 5000];
@@ -66,7 +67,7 @@ export function BalanceModal({ open, user, onClose, toast }) {
 
         <div className={`fm-wallet-hero ${unlimited ? 'fm-wallet-hero--unlimited' : ''}`}>
           <span className="fm-wallet-hero__coin" aria-hidden="true">
-            <CoinArt size={46} />
+            <RefIcon name="coin" height={56} />
           </span>
           <div className="fm-wallet-hero__body">
             <span className="fm-wallet-hero__amount">

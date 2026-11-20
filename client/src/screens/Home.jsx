@@ -4,6 +4,7 @@ import { shareInvite } from '../share.js';
 import { Sheet } from '../components/Sheet.jsx';
 import { CardsArt, TableArt, GiftArt, CrystalArt, StarArt } from '../components/Art.jsx';
 import { RefIcon, REF_ICONS } from '../components/RefIcon.jsx';
+import { Emoji3D, Deck3D } from '../components/Items3D.jsx';
 
 const MODES = [
   { id: 'podkidnoy', label: 'Подкидной' },
@@ -398,7 +399,7 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
         <button type="button" className="v2-tile v2-tile--mint" onClick={onInventory}>
           <span className="v2-tile__glow" aria-hidden="true" />
           <span className="v2-tile__art v3-icon" aria-hidden="true">
-            <StarArt size={48} />
+            <Emoji3D id="emoji_diamond" size={46} />
           </span>
           <span className="v2-tile__title">Инвентарь</span>
           <span className="v2-tile__sub">Колоды, столы, эмодзи</span>

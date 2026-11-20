@@ -7,6 +7,7 @@ import { BankCardArt, BankCaseArt, bankOf } from '../components/BankCard.jsx';
 import { BankCasePanel } from '../components/BankCase.jsx';
 import { CaseRaritySections } from '../components/CaseRarity.jsx';
 import { playCaseSpin, playCaseWin } from '../sfx.js';
+import { Reward3D } from '../components/Items3D.jsx';
 import {
   ChestArt,
   DeckArt,
@@ -95,8 +96,39 @@ export function Shop({ me, toast, refreshMe }) {
   const [busyId, setBusyId] = useState(null);
   const [opening, setOpening] = useState(null);
   const [ratesBox, setRatesBox] = useState(null);
-  const [offset, setOffset] = useState(0);
   const viewportRef = useRef(null);
+  const trackRef = useRef(null);
+  // Каждое открытие получает свой номер: устаревшие таймеры и звук не мешают новому.
+  const runRef = useRef(0);
+  const busyRef = useRef(false);
+  const stopSoundRef = useRef(() => {});
+
+  // Полный сброс: звук, незавершённые таймеры (по номеру запуска) и состояние сцены.
+  function closeScene() {
+    runRef.current += 1;
+    busyRef.current = false;
+    stopSoundRef.current();
+    stopSoundRef.current = () => {};
+    setBusyId(null);
+    setOpening(null);
+  }
+
+  useEffect(() => {
+    if (!opening || opening.phase === 'charge') return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') closeScene();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [opening?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(
+    () => () => {
+      runRef.current += 1;
+      stopSoundRef.current();
+    },
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -113,22 +145,29 @@ export function Shop({ me, toast, refreshMe }) {
     };
   }, [toast]);
 
-  // Запуск движения рулетки: считаем смещение так, чтобы победная ячейка
-  // оказалась точно по центру экрана.
+  // Запуск движения рулетки. Анимация создаётся заново для каждого открытия
+  // (Web Animations), поэтому прошлое положение ленты не может повлиять на новое.
   useEffect(() => {
     if (opening?.phase !== 'spin') return undefined;
+    const track = trackRef.current;
+    if (!track) return undefined;
     const width = viewportRef.current?.clientWidth || 360;
     const target = WIN_INDEX * STEP + CELL / 2 - width / 2;
-    setOffset(0);
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setOffset(target));
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const from = 'translate3d(0, 0, 0)';
+    const to = `translate3d(${-target}px, 0, 0)`;
+    if (typeof track.animate !== 'function') {
+      track.style.transform = to;
+      return undefined;
+    }
+    track.style.transform = from;
+    const animation = track.animate([{ transform: from }, { transform: to }], {
+      duration: reduce ? 600 : SPIN_MS,
+      easing: 'cubic-bezier(0.08, 0.72, 0.05, 1)',
+      fill: 'forwards',
     });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [opening?.phase]);
+    return () => animation.cancel();
+  }, [opening?.phase, opening?.runId]);
 
   const items = catalog?.items || [];
   const cases = catalog?.cases || [];
@@ -175,17 +214,22 @@ export function Shop({ me, toast, refreshMe }) {
   // Кейс: сундук заряжается, затем медленная рулетка и показ именно той
   // награды, которую вернул сервер. Клиент не выбирает предмет.
   async function openCase(box) {
-    if (opening || busyId) return;
+    if (busyRef.current || opening || busyId) return;
+    busyRef.current = true;
+    runRef.current += 1;
+    const run = runRef.current;
+    const stale = () => runRef.current !== run;
+    stopSoundRef.current();
+    stopSoundRef.current = () => {};
     setBusyId(box.id);
-    setOpening({ box, phase: 'charge', strip: [], data: null, item: null });
-    // Звук прокрутки живёт ровно столько, сколько анимация рулетки.
-    let stopSpin = () => {};
+    setOpening({ box, phase: 'charge', strip: [], data: null, item: null, runId: run });
 
     try {
       const started = Date.now();
       const requestId = `${box.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const data = await api('/shop/case', { method: 'POST', body: { caseId: box.id, requestId } });
 
+      // Сервер уже списал/выдал предмет: каталог обновляем в любом случае.
       setCatalog((prev) =>
         prev
           ? {
@@ -198,24 +242,35 @@ export function Shop({ me, toast, refreshMe }) {
           : prev,
       );
       refreshMe?.();
+      if (stale()) return;
 
       // Даём сундуку «зарядиться», даже если сервер ответил мгновенно.
       await sleep(Math.max(0, 1100 - (Date.now() - started)));
+      if (stale()) return;
 
       const strip = buildStrip(box, data.item?.id);
-      setOpening({ box, phase: 'spin', strip, data, item: data.item || null });
+      setOpening({ box, phase: 'spin', strip, data, item: data.item || null, runId: run });
 
-      stopSpin = playCaseSpin(SPIN_MS);
+      // Звук живёт ровно столько, сколько анимация; закрытие сцены глушит его.
+      stopSoundRef.current = playCaseSpin(SPIN_MS);
       await sleep(SPIN_MS + 300);
-      stopSpin();
+      if (stale()) return;
+      stopSoundRef.current();
+      stopSoundRef.current = () => {};
       playCaseWin();
-      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));
+      setOpening((prev) => (prev && prev.runId === run ? { ...prev, phase: 'result' } : prev));
     } catch (error) {
-      stopSpin();
-      setOpening(null);
+      if (!stale()) {
+        stopSoundRef.current();
+        stopSoundRef.current = () => {};
+        setOpening(null);
+      }
       toast(error.message, 'error');
     } finally {
-      setBusyId(null);
+      if (!stale()) {
+        busyRef.current = false;
+        setBusyId(null);
+      }
     }
   }
 
@@ -426,6 +481,11 @@ export function Shop({ me, toast, refreshMe }) {
           <span className="v3-scene__rays" aria-hidden="true" />
           <span className="v3-scene__glow" aria-hidden="true" />
 
+          {opening.phase !== 'charge' ? (
+            <button type="button" className="v3-scene__close" aria-label="Закрыть" onClick={closeScene}>
+              ×
+            </button>
+          ) : null}
           <div className="v3-scene__head">
             <span className="v3-scene__title">{opening.box.name}</span>
             <span className="v3-scene__state">
@@ -458,8 +518,9 @@ export function Shop({ me, toast, refreshMe }) {
             <div className="v3-roulette" ref={viewportRef}>
               <span className="v3-roulette__marker" aria-hidden="true" />
               <div
+                key={opening.runId}
+                ref={trackRef}
                 className="v3-roulette__track"
-                style={{ transform: `translate3d(${-offset}px, 0, 0)` }}
               >
                 {opening.strip.map((prize, index) => (
                   <div
@@ -488,9 +549,19 @@ export function Shop({ me, toast, refreshMe }) {
                 ))}
               </span>
               <span className="v3-reward__ring" aria-hidden="true" />
-              <span className={`v3-reward__art v3-reward--${winRarity}`}>
-                {opening.data?.refund ? <CoinArt size={96} /> : itemArt(opening.item, 96)}
-              </span>
+              {opening.data?.refund ? (
+                <span className={`v3-reward__art v3-reward--${winRarity}`}>
+                  <CoinArt size={96} />
+                </span>
+              ) : (
+                <Reward3D
+                  type={opening.item?.type || 'deck'}
+                  rarity={opening.item?.rarity || winRarity}
+                  name={opening.item?.name || ''}
+                >
+                  {itemArt(opening.item, opening.item?.type === 'table' ? 150 : 128)}
+                </Reward3D>
+              )}
               {opening.data?.refund ? (
                 <>
                   <span className="v3-reward__name">Дубликат</span>
@@ -500,14 +571,13 @@ export function Shop({ me, toast, refreshMe }) {
                 </>
               ) : (
                 <>
-                  <span className="v3-reward__name">{opening.item?.name || 'Предмет получен'}</span>
                   <span className={`v3-reward__rarity v2-rarity v2-rarity--${winRarity}`}>
                     {RARITY_LABEL[winRarity] || 'обычный'}
                   </span>
                   {opening.item?.desc ? <p className="v3-reward__hint">{opening.item.desc}</p> : null}
                 </>
               )}
-              <button type="button" className="v2-btn v2-btn--primary" onClick={() => setOpening(null)}>
+              <button type="button" className="v2-btn v2-btn--primary" onClick={closeScene}>
                 Забрать
               </button>
             </div>
