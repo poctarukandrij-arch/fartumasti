@@ -4,8 +4,9 @@ import Seat from '../components/Seat.jsx';
 import { PlayerTag } from '../components/PlayerTag.jsx';
 import Chat from '../components/Chat.jsx';
 import { deckClassOf, tableClassOf } from '../catalog.js';
-import { suitSymbol } from '../utils.js';
+import { suitSymbol, rub } from '../utils.js';
 import { shareInvite } from '../share.js';
+import { Crown, GoldCoin } from '../components/Crown.jsx';
 
 const SUIT_NAME = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
 
@@ -168,93 +169,126 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
 
   const waiting = room.status === 'waiting' || !game;
 
+  // Игроки по кругу: «вы» всегда внизу, остальные садятся по часовой стрелке.
+  const rawSeats = waiting
+    ? room.players.map((player) => ({
+        userId: player.userId,
+        name: player.username,
+        cards: 0,
+        equipped: player.equipped,
+        connected: player.connected,
+        ready: player.ready,
+        mic: player.mic,
+      }))
+    : players.map((player) => {
+        const info = room.players.find((entry) => entry.userId === player.userId) || {};
+        return { ...player, equipped: player.equipped || info.equipped, connected: player.connected ?? info.connected, mic: player.mic ?? info.mic };
+      });
+  const myIndex = Math.max(0, rawSeats.findIndex((player) => player.userId === myId));
+  const ordered = rawSeats.map((_, index) => rawSeats[(myIndex + index) % rawSeats.length]);
+  const SLOTS = { 1: ['bottom'], 2: ['bottom', 'top'], 3: ['bottom', 'left', 'right'], 4: ['bottom', 'left', 'top', 'right'] };
+  const slots = SLOTS[Math.min(4, Math.max(1, ordered.length))];
+  const stake = Number(room.pot) > 0 ? { label: 'Банк', value: room.pot } : Number(room.buyIn) > 0 ? { label: 'Взнос', value: room.buyIn } : null;
+
   return (
-    <div className="table-screen">
-      <header className="table-screen__head">
-        <button type="button" className="icon-btn" onClick={onLeave} aria-label="Выйти из стола">
-          ←
+    <div className="table-screen rd-table">
+      <header className="rd-tablebar">
+        <button type="button" className="rd-back" onClick={onLeave} aria-label="Выйти из стола">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
         </button>
-        <button type="button" className="icon-btn" onClick={onRules} aria-label="Правила игры">
-          ?
-        </button>
-        <div className="table-screen__title">
-          {room.name}
-          <span className="small muted">
+        <button type="button" className="rd-tablebar__title" onClick={copyCode} aria-label="Скопировать код стола">
+          <span className="rd-tablebar__name">Стол №{isPrivate && inviteCode ? inviteCode : room.code || room.id}</span>
+          <span className="rd-tablebar__meta">
             {room.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · {room.players.length}/{room.maxPlayers}
           </span>
-        </div>
-        {secondsLeft !== null && !waiting ? (
-          <span className="chip chip--pulse">{secondsLeft} с</span>
-        ) : (
-          <button type="button" className="chip" onClick={copyCode}>
-            {isPrivate && inviteCode ? inviteCode : room.code || room.id}
-          </button>
-        )}
+        </button>
+        {secondsLeft !== null && !waiting ? <span className="rd-timer">{secondsLeft} с</span> : null}
+        <span className="rd-tablebar__spacer" />
+        <button type="button" className="rd-round" onClick={onRules} aria-label="Правила игры">
+          ?
+        </button>
         <button
           type="button"
-          className={`icon-btn ${showChat ? 'icon-btn--active' : ''}`}
+          className={`rd-round ${showChat ? 'rd-round--on' : ''}`}
           onClick={() => setShowChat((prev) => !prev)}
           aria-label="Чат"
         >
-          ✎
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+            <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H11l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+          </svg>
         </button>
         <button
           type="button"
-          className={`icon-btn ${showVoice ? 'icon-btn--active' : ''}`}
+          className={`rd-round ${showVoice ? 'rd-round--on' : ''}`}
           onClick={() => setShowVoice((prev) => !prev)}
           aria-label="Голос"
         >
-          ♪
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+          </svg>
         </button>
       </header>
 
-      <div className={`felt ${feltClass}`}>
-        <div className="seat-row">
-          {players.map((player) => (
-            <Seat
-              key={player.userId}
-              player={player}
-              isMe={player.userId === myId}
-              isTurn={player.userId === game?.turnUserId}
-              deckClass={deckClass}
-            />
-          ))}
+      {stake ? (
+        <div className="rd-bank">
+          <GoldCoin size={22} />
+          <span>
+            {stake.label}: <b>{rub(stake.value)}</b>
+          </span>
+        </div>
+      ) : null}
+
+      <div className="rd-stage" data-felt={feltClass.replace('felt--', '')}>
+        <div className="rd-oval" aria-hidden="true">
+          <span className="rd-oval__crown">
+            <Crown size={86} tone="purple" />
+          </span>
         </div>
 
+        {ordered.map((player, index) => (
+          <Seat
+            key={player.userId}
+            player={player}
+            slot={slots[index] || 'top'}
+            isMe={player.userId === myId}
+            isTurn={!waiting && player.userId === game?.turnUserId}
+            deckClass={deckClass}
+            waiting={waiting}
+          />
+        ))}
+
         {waiting ? (
-          <div className="waiting">
-            <div className="waiting__orbit" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </div>
+          <div className="rd-center rd-center--wait">
             <span className="waiting__count">
               {room.players.length} / {room.maxPlayers} игроков
             </span>
-            <p className="muted small center" style={{ margin: 0 }}>
+            <p className="rd-note">
               {isPrivate ? (
                 <>
-                  Приватный стол. Код приглашения <b>{inviteCode}</b> — войти можно только по нему.
+                  Приватный стол. Код приглашения <b>{inviteCode}</b>.
                 </>
               ) : (
                 <>
-                  Открытый стол. Код <b>{room.code || room.id}</b> — отправьте другу. Ботов за столом нет.
+                  Открытый стол. Код <b>{room.code || room.id}</b>. Ботов за столом нет.
                 </>
               )}
             </p>
-            <div className="table-actions">
-              <button type="button" className="btn btn--soft btn--sm" onClick={invitePlayer}>
-                Пригласить игрока
+            <div className="rd-waitbtns">
+              <button type="button" className="rd-btn rd-btn--violet rd-btn--sm" onClick={invitePlayer}>
+                Пригласить
               </button>
-              <button type="button" className="btn btn--soft btn--sm" onClick={copyInviteLink}>
-                Скопировать приглашение
+              <button type="button" className="rd-btn rd-btn--violet rd-btn--sm" onClick={copyInviteLink}>
+                Ссылка
               </button>
-              <button type="button" className="btn btn--soft btn--sm" onClick={copyCode}>
-                Скопировать код
+              <button type="button" className="rd-btn rd-btn--violet rd-btn--sm" onClick={copyCode}>
+                Код
               </button>
               <button
                 type="button"
-                className="btn btn--soft btn--sm"
+                className={`rd-btn rd-btn--sm ${room.you?.ready ? 'rd-btn--violet' : 'rd-btn--gold'}`}
                 onClick={() => send({ type: 'room:ready' })}
               >
                 {room.you?.ready ? 'Не готов' : 'Готов'}
@@ -262,7 +296,7 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
               {room.you?.isOwner ? (
                 <button
                   type="button"
-                  className="btn btn--primary btn--sm"
+                  className="rd-btn rd-btn--gold rd-btn--sm"
                   disabled={room.players.length < 2}
                   onClick={() => send({ type: 'room:start' })}
                 >
@@ -270,22 +304,10 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
                 </button>
               ) : null}
             </div>
-            <div className="seats-dots">
-              {room.players.map((player) => (
-                <span key={player.userId} className={`seat-dot ${player.connected ? 'seat-dot--on' : ''}`}>
-                  <PlayerTag
-                    name={player.username}
-                    emoji={player.emoji || player.equipped?.emojis || player.emojis}
-                    size={12}
-                  />
-                  {player.ready ? ' ✓' : ''}
-                </span>
-              ))}
-            </div>
           </div>
         ) : (
-          <>
-            <div className="table-center">
+          <div className="rd-center">
+            <div className="rd-deck">
               <div className="deck-stack">
                 <CardBack deckClass={deckClass} />
                 <span className="deck-stack__count">{game.deckCount}</span>
@@ -293,7 +315,7 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
               {game.trumpCard ? (
                 <div className="trump">
                   <PlayingCard card={game.trumpCard} size="xs" />
-                  <span className="small muted">козырь {suitSymbol(game.trumpSuit)}</span>
+                  <span className="rd-trump__label">козырь {suitSymbol(game.trumpSuit)}</span>
                 </div>
               ) : null}
             </div>
@@ -322,130 +344,143 @@ export function TableScreen({ room, me, send, voice, toast, onLeave, onRefreshMe
                 ))
               )}
             </div>
-
-            <div className="turn-banner">
-              {game.finished
-                ? 'Партия завершена'
-                : canAct
-                ? isDefender
-                  ? 'Ваш ход: отбивайтесь или возьмите карты'
-                  : 'Ваш ход: подкиньте карту или скажите «бито»'
-                : turnPlayer
-                ? `Ход: ${turnPlayer.name}`
-                : 'Ожидание соперника'}
-            </div>
-
-            <div className="hand">
-              {hand.map((card) => {
-                const playable = cardPlayable(card.id);
-                return (
-                  <span key={card.id} className={`hand__card ${playable ? 'hand__card--playable' : 'hand__card--dim'}`}>
-                    <PlayingCard
-                      card={card}
-                      size="sm"
-                      deckClass={deckClass}
-                      selected={selected === card.id}
-                      onClick={() => setSelected((prev) => (prev === card.id ? null : card.id))}
-                    />
-                  </span>
-                );
-              })}
-              {hand.length === 0 ? <span className="muted small">Карт нет</span> : null}
-            </div>
-
-            <div className="table-actions">
-              {canAct && !isDefender ? (
-                <>
-                  <button type="button" className="btn btn--primary btn--sm" onClick={playAttack} disabled={!selected}>
-                    {table.length === 0 ? 'Атаковать' : 'Подкинуть'}
-                  </button>
-                  {transferIds.size > 0 ? (
-                    <button
-                      type="button"
-                      className="btn btn--soft btn--sm"
-                      onClick={playTransfer}
-                      disabled={!selected || !transferIds.has(selected)}
-                    >
-                      Перевести
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="btn btn--soft btn--sm"
-                    onClick={() => send({ type: 'end' })}
-                    disabled={!legal.canEnd}
-                  >
-                    Бито
-                  </button>
-                </>
-              ) : null}
-
-              {canAct && isDefender ? (
-                <>
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    onClick={() => playDefend()}
-                    disabled={!selected || defendOptions.length === 0}
-                  >
-                    Отбить
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--danger btn--sm"
-                    onClick={() => {
-                      send({ type: 'take' });
-                      setSelected(null);
-                    }}
-                    disabled={!legal.canTake}
-                  >
-                    Взять
-                  </button>
-                  {transferIds.size > 0 ? (
-                    <button
-                      type="button"
-                      className="btn btn--soft btn--sm"
-                      onClick={playTransfer}
-                      disabled={!selected || !transferIds.has(selected)}
-                    >
-                      Перевести
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
-
-              {!canAct ? <span className="table-note">Ждём ход соперника…</span> : null}
-            </div>
-          </>
+          </div>
         )}
+      </div>
 
-        {room.finished && room.result ? (
-          <div className="result">
-            <div className="result__card">
-              <span className="result__title">
-                {room.result.loserId === myId ? 'Вы проиграли' : 'Вы победили'}
-              </span>
-              <span className="result__sub">
-                {room.result.loserName ? `Дурак: ${room.result.loserName}` : 'Партия завершена'}
-              </span>
-              <div className="result__actions">
-                {room.you?.isOwner ? (
+      {!waiting ? (
+        <>
+          <div className="rd-status" role="status">
+            {game.finished
+              ? 'Партия завершена'
+              : canAct
+              ? isDefender
+                ? 'Ваш ход: отбивайтесь или возьмите карты'
+                : 'Ваш ход: подкиньте карту или скажите «бито»'
+              : turnPlayer
+              ? `Ход: ${turnPlayer.name}`
+              : 'Ожидание соперника'}
+          </div>
+
+          <div className="hand rd-hand" style={{ '--n': hand.length }}>
+            {hand.map((card, index) => {
+              const playable = cardPlayable(card.id);
+              return (
+                <span
+                  key={card.id}
+                  className={`hand__card ${playable ? 'hand__card--playable' : 'hand__card--dim'} ${
+                    selected === card.id ? 'hand__card--picked' : ''
+                  }`}
+                  style={{ '--i': index }}
+                >
+                  <PlayingCard
+                    card={card}
+                    size="md"
+                    deckClass={deckClass}
+                    selected={selected === card.id}
+                    onClick={() => setSelected((prev) => (prev === card.id ? null : card.id))}
+                  />
+                </span>
+              );
+            })}
+            {hand.length === 0 ? <span className="muted small">Карт нет</span> : null}
+          </div>
+
+          <div className="rd-actions">
+            {canAct && !isDefender ? (
+              <>
+                <button
+                  type="button"
+                  className="rd-btn rd-btn--violet rd-actions__left"
+                  onClick={() => send({ type: 'end' })}
+                  disabled={!legal.canEnd}
+                >
+                  Бито
+                </button>
+                {transferIds.size > 0 ? (
                   <button
                     type="button"
-                    className="btn btn--primary btn--sm"
-                    onClick={() => send({ type: 'room:start' })}
+                    className="rd-btn rd-btn--violet rd-actions__mid"
+                    onClick={playTransfer}
+                    disabled={!selected || !transferIds.has(selected)}
                   >
-                    Играть снова
+                    Перевести
                   </button>
                 ) : null}
-                <button type="button" className="btn btn--soft btn--sm" onClick={onLeave}>
-                  Выйти
+                <button
+                  type="button"
+                  className="rd-btn rd-btn--orange rd-actions__right"
+                  onClick={playAttack}
+                  disabled={!selected}
+                >
+                  <span className="rd-btn__play" aria-hidden="true">▶</span>
+                  {table.length === 0 ? 'Атаковать' : 'Подкинуть'}
                 </button>
-              </div>
+              </>
+            ) : null}
+
+            {canAct && isDefender ? (
+              <>
+                <button
+                  type="button"
+                  className="rd-btn rd-btn--violet rd-actions__left"
+                  onClick={() => {
+                    send({ type: 'take' });
+                    setSelected(null);
+                  }}
+                  disabled={!legal.canTake}
+                >
+                  Брать карты
+                </button>
+                {transferIds.size > 0 ? (
+                  <button
+                    type="button"
+                    className="rd-btn rd-btn--violet rd-actions__mid"
+                    onClick={playTransfer}
+                    disabled={!selected || !transferIds.has(selected)}
+                  >
+                    Перевести
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="rd-btn rd-btn--orange rd-actions__right"
+                  onClick={() => playDefend()}
+                  disabled={!selected || defendOptions.length === 0}
+                >
+                  <span className="rd-btn__play" aria-hidden="true">▶</span>
+                  Отбить
+                </button>
+              </>
+            ) : null}
+
+            {!canAct ? <span className="table-note rd-wait">Ждём ход соперника…</span> : null}
+          </div>
+        </>
+      ) : null}
+
+      {room.finished && room.result ? (
+        <div className="result">
+          <div className="result__card">
+            <span className="result__title">
+              {room.result.loserId === myId ? 'Вы проиграли' : 'Вы победили'}
+            </span>
+            <span className="result__sub">
+              {room.result.loserName ? `Дурак: ${room.result.loserName}` : 'Партия завершена'}
+            </span>
+            <div className="result__actions">
+              {room.you?.isOwner ? (
+                <button type="button" className="rd-btn rd-btn--gold rd-btn--sm" onClick={() => send({ type: 'room:start' })}>
+                  Играть снова
+                </button>
+              ) : null}
+              <button type="button" className="rd-btn rd-btn--violet rd-btn--sm" onClick={onLeave}>
+                Выйти
+              </button>
             </div>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {showVoice ? (
         <div className="voice-panel fm-voice">

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { rub } from '../utils.js';
 import { PlayerTag } from '../components/PlayerTag.jsx';
 import { shareInvite } from '../share.js';
+import { Avatar } from '../components/Avatar.jsx';
+import { Crown } from '../components/Crown.jsx';
 
 const num = (value) => Number(value) || 0;
 
@@ -33,6 +35,15 @@ export function Profile({ me, stats, onLogout, onWithdraw, onInventory, refreshM
   const games = num(stats?.gamesPlayed ?? stats?.games ?? me?.stats?.gamesPlayed);
   const wins = num(stats?.wins ?? me?.stats?.wins);
   const losses = num(stats?.losses ?? me?.stats?.losses);
+  const winRate = num(stats?.winRate) || (games > 0 ? Math.round((wins / games) * 100) : 0);
+  const nameRef = useRef(null);
+
+  function focusName() {
+    const node = nameRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    node.focus({ preventScroll: true });
+  }
 
   async function saveName() {
     const value = name.trim();
@@ -78,24 +89,35 @@ export function Profile({ me, stats, onLogout, onWithdraw, onInventory, refreshM
 
   return (
     <div className="screen v2">
-      <section className="v2-profile-head">
-        <span className="v2-avatar" aria-hidden="true">
-          {(me?.username || '?').slice(0, 2).toUpperCase()}
-        </span>
-        <div className="v2-profile__info">
-          <span className="v2-profile__name">
-            <PlayerTag
-              name={me?.username || 'Без имени'}
-              emoji={me?.emoji || equipped?.emojis}
-              size={18}
-            />
+      <section className="rd-profile">
+        <div className="rd-profile__ava">
+          <Crown size={64} className="rd-profile__crown" />
+          <Avatar name={me?.username || '?'} size={112} ring="gold" />
+        </div>
+        <div className="rd-profile__info">
+          <span className="rd-profile__name">
+            <PlayerTag name={me?.username || 'Без имени'} emoji={me?.emoji || equipped?.emojis} size={18} />
             {unlimited ? <span className="v2-badge-unlim">безлимит</span> : null}
           </span>
-          <span className="v2-profile__id">Telegram ID: {telegramId}</span>
-          <span className="v2-profile__id">
-            Баланс: {unlimited ? '∞' : rub(balance)}
-          </span>
+          <span className="rd-profile__id">ID: {telegramId}</span>
+          <dl className="rd-profile__stats">
+            <div>
+              <dt>Побед:</dt>
+              <dd>{wins}</dd>
+            </div>
+            <div>
+              <dt>Поражений:</dt>
+              <dd>{losses}</dd>
+            </div>
+            <div>
+              <dt>Процент побед:</dt>
+              <dd>{winRate}%</dd>
+            </div>
+          </dl>
         </div>
+        <button type="button" className="rd-btn rd-btn--violet rd-profile__edit" onClick={focusName}>
+          Редактировать
+        </button>
       </section>
 
       <section className="v2-panel">
@@ -194,6 +216,7 @@ export function Profile({ me, stats, onLogout, onWithdraw, onInventory, refreshM
         <div className="v2-field">
           <span className="v2-field__label">Ник в игре</span>
           <input
+            ref={nameRef}
             className="v2-input"
             value={name}
             onChange={(event) => setName(event.target.value.slice(0, 12))}

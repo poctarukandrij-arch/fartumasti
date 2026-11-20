@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { rub } from '../utils.js';
 import { shareInvite } from '../share.js';
 import { Sheet } from '../components/Sheet.jsx';
-import { BoltArt, CardsArt, TableArt, GiftArt, CrystalArt, StarArt } from '../components/Art.jsx';
-import { EmblemArt } from '../components/Emblem.jsx';
+import { CardsArt, TableArt, GiftArt, CrystalArt, StarArt, TrophyArt, ShopArt, WalletArt } from '../components/Art.jsx';
+import { Mascot } from '../components/Avatar.jsx';
+import { Crown } from '../components/Crown.jsx';
+import { Logo } from '../components/Logo.jsx';
 
 const MODES = [
   { id: 'podkidnoy', label: 'Подкидной' },
@@ -15,6 +17,15 @@ const DECKS = [24, 36, 52];
 
 // Входной взнос задаётся вручную: минимум 200 ₽, «без взноса» больше нет.
 const MIN_BUYN = 200;
+
+// Уровни комнат — быстрые пресеты входного взноса для создания стола.
+// Правила и лимиты те же, что в форме «Новый стол» (минимум 200 ₽, 2–4 игрока).
+const TIERS = [
+  { id: 'novice', name: 'Новичок', tone: 'green', crown: 'green', buyin: 200 },
+  { id: 'amateur', name: 'Любитель', tone: 'blue', crown: 'silver', buyin: 500 },
+  { id: 'pro', name: 'Профи', tone: 'purple', crown: 'purple', buyin: 1000 },
+  { id: 'elite', name: 'Элита', tone: 'gold', crown: 'red', buyin: 5000 },
+];
 const MAX_BUYN = 500000;
 
 function deckLabel(size) {
@@ -32,7 +43,7 @@ function modeLabel(mode) {
   return mode === 'perevodnoy' ? 'Переводной' : 'Подкидной';
 }
 
-export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, onSupport }) {
+export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, onSupport, onBalance, onTab }) {
   const [sheet, setSheet] = useState(null); // 'create' | 'join' | null
   const [players, setPlayers] = useState(2);
   const [mode, setMode] = useState('podkidnoy');
@@ -40,6 +51,7 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
   const [deckSize, setDeckSize] = useState(36);
   const [visibility, setVisibility] = useState('public');
   const [code, setCode] = useState('');
+  const [view, setView] = useState('main'); // 'main' | 'rooms'
 
   const rooms = lobby?.rooms || [];
   const online = Number(lobby?.online) || 0;
@@ -82,101 +94,31 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
     setCode('');
   }
 
+  function pickTier(tier) {
+    setBuyin(String(tier.buyin));
+    setSheet('create');
+  }
+
   async function invite() {
     const result = await shareInvite({ username });
     if (result === 'clipboard') toast?.('Приглашение скопировано — открой Telegram');
     if (result === 'cancel') toast?.('Отправка отменена');
   }
 
-  return (
-    <div className="v2 v3-home">
-      <section className="v2-hero v3-hero">
-        <span className="v2-hero__rays" aria-hidden="true" />
-        <span className="fm-emblem__glow" aria-hidden="true" />
-        <div className="v3-hero__text">
-          <span className="v2-live">
-            <span className="v2-live__dot" aria-hidden="true" />
-            {online} онлайн
-          </span>
-          <h1 className="v2-hero__title v3-hero__title">Играй в «Дурака»</h1>
-          <p className="v2-hero__sub v3-hero__sub">Живые соперники и честные раздачи.</p>
-        </div>
-        <span className="fm-emblem" aria-hidden="true">
-          <EmblemArt size={112} />
-        </span>
-      </section>
-
-      <button type="button" className={`v2-cta ${inQueue ? 'v2-cta--waiting' : ''}`} onClick={play}>
-        <span className="v2-cta__art v3-icon" aria-hidden="true">
-          <BoltArt size={50} />
-        </span>
-        <span className="v2-cta__body">
-          <span className="v2-cta__label">{inQueue ? 'Поиск соперника…' : 'Играть'}</span>
-          <span className="v2-cta__hint">{inQueue ? 'Нажми, чтобы отменить' : 'Быстрый поиск соперника'}</span>
-        </span>
-        <span className="v2-cta__arrow" aria-hidden="true">{inQueue ? '✕' : '›'}</span>
-      </button>
-
-      <div className="v2-grid2">
-        <button type="button" className="v2-tile" onClick={() => setSheet('create')}>
-          <span className="v2-tile__glow" aria-hidden="true" />
-          <span className="v2-tile__art v3-icon" aria-hidden="true">
-            <CardsArt size={56} />
-          </span>
-          <span className="v2-tile__title">Создать стол</span>
-          <span className="v2-tile__sub">Взнос, колода и режим</span>
-        </button>
-
-        <button type="button" className="v2-tile v2-tile--cyan" onClick={() => setSheet('join')}>
-          <span className="v2-tile__glow" aria-hidden="true" />
-          <span className="v2-tile__art v3-icon" aria-hidden="true">
-            <TableArt itemId="table_ocean" size={56} />
-          </span>
-          <span className="v2-tile__title">Присоединиться</span>
-          <span className="v2-tile__sub">По коду стола</span>
-        </button>
+  const openTables = (
+    <section className="v2-panel rd-panel">
+      <div className="v2-title">
+        <span>Открытые столы</span>
+        <span className="v2-chip">{rooms.length}</span>
       </div>
 
-      <button type="button" className="v2-tile v2-tile--pink" onClick={invite}>
-        <span className="v2-tile__glow" aria-hidden="true" />
-        <span className="v2-tile__art v3-icon" aria-hidden="true">
-          <GiftArt size={54} />
-        </span>
-        <span className="v2-tile__title">Пригласить друга</span>
-        <span className="v2-tile__sub">Открыть чаты Telegram и отправить ссылку</span>
-      </button>
-
-      <div className="v2-grid2">
-        <button type="button" className="v2-tile v2-tile--violet" onClick={onRules}>
-          <span className="v2-tile__glow" aria-hidden="true" />
-          <span className="v2-tile__art v3-icon" aria-hidden="true">
-            <CrystalArt size={50} tone="violet" />
-          </span>
-          <span className="v2-tile__title">Правила игры</span>
-          <span className="v2-tile__sub">Как бить и подкидывать</span>
-        </button>
-
-        <button type="button" className="v2-tile v2-tile--mint" onClick={onInventory}>
-          <span className="v2-tile__glow" aria-hidden="true" />
-          <span className="v2-tile__art v3-icon" aria-hidden="true">
-            <StarArt size={50} />
-          </span>
-          <span className="v2-tile__title">Инвентарь</span>
-          <span className="v2-tile__sub">Колоды, столы, эмодзи</span>
-        </button>
-      </div>
-
-      <section className="v2-panel">
-        <div className="v2-title">
-          <span>Открытые столы</span>
-          <span className="v2-chip">{rooms.length}</span>
-        </div>
-
-        {rooms.length === 0 ? (
-          <div className="v2-empty">Пока нет открытых столов. Создай свой — и пригласи друга.</div>
-        ) : (
-          <div className="v2-stack">
-            {rooms.map((room) => (
+      {rooms.length === 0 ? (
+        <div className="v2-empty">Пока нет открытых столов. Создай свой — и пригласи друга.</div>
+      ) : (
+        <div className="v2-stack">
+          {rooms.map((room) => {
+            const stake = Number(room.buyIn ?? room.buyn) || 0;
+            return (
               <button
                 key={room.id}
                 type="button"
@@ -194,28 +136,19 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
                   </span>
                 </span>
                 <span className="v2-row__side">
-                  <span className="v2-chip v2-chip--mint">{room.buyn > 0 ? rub(room.buyn) : 'бесплатно'}</span>
+                  <span className="v2-chip v2-chip--mint">{stake > 0 ? rub(stake) : 'бесплатно'}</span>
                   <span className="v2-chip">код {room.code || '—'}</span>
                 </span>
               </button>
-            ))}
-          </div>
-        )}
-      </section>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
 
-      <button type="button" className="v2-row" onClick={onSupport}>
-        <span className="v2-row__art v3-icon" aria-hidden="true">
-          <CrystalArt size={34} tone="mint" />
-        </span>
-        <span className="v2-row__body">
-          <span className="v2-row__name">Поддержка</span>
-          <span className="v2-row__meta">Вопросы, ошибки и предложения</span>
-        </span>
-        <span className="v2-row__side">
-          <span className="v2-chip">›</span>
-        </span>
-      </button>
-
+  const sheets = (
+    <>
       <Sheet
         open={sheet === 'create'}
         onClose={() => setSheet(null)}
@@ -344,6 +277,159 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
           Войти за стол
         </button>
       </Sheet>
+    </>
+  );
+
+  if (view === 'rooms') {
+    return (
+      <div className="v2 v3-home rd-rooms">
+        <div className="rd-subhead">
+          <button type="button" className="rd-back" onClick={() => setView('main')} aria-label="Назад">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" />
+            </svg>
+          </button>
+          <h1 className="rd-subhead__title">Выбор комнаты</h1>
+        </div>
+
+        <div className="rd-tiers">
+          {TIERS.map((tier) => (
+            <article key={tier.id} className={`rd-tier rd-tier--${tier.tone}`}>
+              <span className="rd-tier__name">{tier.name}</span>
+              <span className="rd-tier__crown">
+                <Crown size={70} tone={tier.crown} />
+              </span>
+              <span className="rd-tier__price">от {tier.buyin.toLocaleString('ru-RU')} ₽</span>
+              <span className="rd-tier__players">Игроков: 2–4</span>
+              <button type="button" className="rd-btn rd-btn--gold rd-tier__play" onClick={() => pickTier(tier)}>
+                Играть
+              </button>
+            </article>
+          ))}
+        </div>
+
+        <div className="rd-quick">
+          <button type="button" className="rd-btn rd-btn--violet" onClick={() => setSheet('create')}>
+            Свой стол
+          </button>
+          <button type="button" className="rd-btn rd-btn--violet" onClick={() => setSheet('join')}>
+            По коду
+          </button>
+        </div>
+
+        {openTables}
+        {sheets}
+      </div>
+    );
+  }
+
+  return (
+    <div className="v2 v3-home rd-home">
+      <section className="rd-hero">
+        <span className="rd-hero__glow" aria-hidden="true" />
+        <span className="rd-hero__deco rd-hero__deco--a" aria-hidden="true">♠</span>
+        <span className="rd-hero__deco rd-hero__deco--b" aria-hidden="true">♥</span>
+        <span className="rd-hero__deco rd-hero__deco--c" aria-hidden="true">♣</span>
+        <div className="rd-hero__text">
+          <Logo size="lg" />
+          <span className="rd-ribbon">Играй вместе с друзьями!</span>
+          <span className="v2-live rd-live">
+            <span className="v2-live__dot" aria-hidden="true" />
+            {online} онлайн
+          </span>
+        </div>
+        <Mascot name={username || 'Игрок'} className="rd-hero__mascot" />
+      </section>
+
+      <div className="rd-trio">
+        <button type="button" className="rd-trio__tile rd-trio__tile--violet" onClick={() => setView('rooms')}>
+          <span className="rd-trio__art" aria-hidden="true">
+            <TrophyArt size={46} />
+          </span>
+          <span className="rd-trio__label">Игровые комнаты</span>
+        </button>
+        <button type="button" className="rd-trio__tile rd-trio__tile--gold" onClick={() => onTab?.('shop')}>
+          <span className="rd-trio__art" aria-hidden="true">
+            <ShopArt size={46} />
+          </span>
+          <span className="rd-trio__label">Магазин</span>
+        </button>
+        <button type="button" className="rd-trio__tile rd-trio__tile--blue" onClick={onBalance}>
+          <span className="rd-trio__art" aria-hidden="true">
+            <WalletArt size={46} />
+          </span>
+          <span className="rd-trio__label">Кошелёк</span>
+        </button>
+      </div>
+
+      <button type="button" className={`rd-play ${inQueue ? 'rd-play--waiting' : ''}`} onClick={play}>
+        <span className="rd-play__icon" aria-hidden="true">{inQueue ? '✕' : '▶'}</span>
+        <span className="rd-play__label">{inQueue ? 'Поиск соперника…' : 'Играть'}</span>
+      </button>
+      {inQueue ? <p className="rd-play__hint">Нажми, чтобы отменить поиск</p> : null}
+
+      <div className="v2-grid2 rd-actions">
+        <button type="button" className="v2-tile" onClick={() => setSheet('create')}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <CardsArt size={52} />
+          </span>
+          <span className="v2-tile__title">Создать стол</span>
+          <span className="v2-tile__sub">Взнос, колода и режим</span>
+        </button>
+
+        <button type="button" className="v2-tile v2-tile--cyan" onClick={() => setSheet('join')}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <TableArt itemId="table_ocean" size={52} />
+          </span>
+          <span className="v2-tile__title">Присоединиться</span>
+          <span className="v2-tile__sub">По коду стола</span>
+        </button>
+
+        <button type="button" className="v2-tile v2-tile--pink" onClick={invite}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <GiftArt size={50} />
+          </span>
+          <span className="v2-tile__title">Пригласить друга</span>
+          <span className="v2-tile__sub">Ссылка в Telegram</span>
+        </button>
+
+        <button type="button" className="v2-tile v2-tile--mint" onClick={onInventory}>
+          <span className="v2-tile__glow" aria-hidden="true" />
+          <span className="v2-tile__art v3-icon" aria-hidden="true">
+            <StarArt size={48} />
+          </span>
+          <span className="v2-tile__title">Инвентарь</span>
+          <span className="v2-tile__sub">Колоды, столы, эмодзи</span>
+        </button>
+      </div>
+
+      {openTables}
+
+      <div className="v2-grid2 rd-actions">
+        <button type="button" className="v2-row" onClick={onRules}>
+          <span className="v2-row__art v3-icon" aria-hidden="true">
+            <CrystalArt size={34} tone="violet" />
+          </span>
+          <span className="v2-row__body">
+            <span className="v2-row__name">Правила игры</span>
+            <span className="v2-row__meta">Как бить и подкидывать</span>
+          </span>
+        </button>
+        <button type="button" className="v2-row" onClick={onSupport}>
+          <span className="v2-row__art v3-icon" aria-hidden="true">
+            <CrystalArt size={34} tone="mint" />
+          </span>
+          <span className="v2-row__body">
+            <span className="v2-row__name">Поддержка</span>
+            <span className="v2-row__meta">Вопросы и ошибки</span>
+          </span>
+        </button>
+      </div>
+
+      {sheets}
     </div>
   );
 }

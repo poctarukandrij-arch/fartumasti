@@ -1,6 +1,7 @@
 // Объёмная графика FARTU MASTI: сундуки кейсов, эффекты, эмодзи, колоды, столы.
 // Всё нарисовано векторно (SVG с градиентами и бликами) — без внешних файлов и эмодзи-заглушек.
 import { useId } from 'react';
+import { ChestSprite, chestSprite } from './ChestSprite.jsx';
 
 function useIds() {
   const raw = useId().replace(/[:]/g, '');
@@ -97,21 +98,25 @@ export function CardsArt({ size = 34 }) {
   );
 }
 
-export function TrophyArt({ size = 34 }) {
+export function TrophyArt({ size = 34, tone = 'gold' }) {
   const u = useIds();
+  const palette =
+    tone === 'violet'
+      ? ['#C9B8FF', '#8B5CF6', '#5B21B6', '#A78BFA']
+      : ['#FFF3A6', '#FFC400', '#B9770E', '#FFD84D'];
   return (
     <svg className="art art--trophy" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
       <defs>
         <linearGradient id={u('a')} x1="12" y1="6" x2="36" y2="34" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#C9B8FF" />
-          <stop offset="0.5" stopColor="#8B5CF6" />
-          <stop offset="1" stopColor="#5B21B6" />
+          <stop offset="0" stopColor={palette[0]} />
+          <stop offset="0.5" stopColor={palette[1]} />
+          <stop offset="1" stopColor={palette[2]} />
         </linearGradient>
       </defs>
       <ellipse cx="24" cy="44" rx="12" ry="3" fill="#05030F" opacity="0.45" />
       <path d="M14 7h20v9c0 6.1-4.5 11-10 11S14 22.1 14 16Z" fill={`url(#${u('a')})`} />
-      <path d="M14 9h-3.5a6.5 6.5 0 0 0 6.5 8.5M34 9h3.5A6.5 6.5 0 0 1 31 17.5" stroke="#A78BFA" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-      <path d="M24 27v7" stroke="#A78BFA" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M14 9h-3.5a6.5 6.5 0 0 0 6.5 8.5M34 9h3.5A6.5 6.5 0 0 1 31 17.5" stroke={palette[3]} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      <path d="M24 27v7" stroke={palette[3]} strokeWidth="3.2" strokeLinecap="round" />
       <rect x="15" y="34" width="18" height="4.6" rx="2.3" fill={`url(#${u('a')})`} />
       <path d="M19 11.5c1.6 3.4 3 5 6.4 6.2" stroke="#FFFFFF" strokeOpacity="0.75" strokeWidth="2" strokeLinecap="round" fill="none" />
     </svg>
@@ -246,6 +251,7 @@ function ChestBody({ u, theme }) {
 export function ChestArt({ theme: themeId = 'case_bank', size = 120, open = false }) {
   const u = useIds();
   const theme = CHEST_THEMES[themeId] || CHEST_THEMES.case_bank;
+  if (chestSprite(themeId)) return <ChestSprite caseId={themeId} size={size} open={open} />;
   return (
     <svg className="art art--chest" width={size} height={size} viewBox="0 0 120 120" aria-hidden="true">
       <defs>
@@ -607,5 +613,51 @@ export function MonogramArt({ name = '?', size = 44 }) {
     <span className="monogram" style={{ width: size, height: size, fontSize: size * 0.36 }} aria-hidden="true">
       <span>{letters}</span>
     </span>
+  );
+}
+
+/* ────────────────────────────── плитки главного экрана ────────────────────────────── */
+
+export function ShopArt({ size = 40 }) {
+  const u = useIds();
+  return (
+    <svg className="art" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <defs>
+        <linearGradient id={u('a')} x1="8" y1="10" x2="40" y2="38" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#D9D2F2" />
+        </linearGradient>
+      </defs>
+      <path d="M3 6h6l5 20h22l5-15H12" fill="none" stroke="#5B3A12" strokeWidth="5.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+      <path d="M3 6h6l5 20h22l5-15H12" fill="none" stroke={`url(#${u('a')})`} strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13 12h26l-4 13H16.500z" fill={`url(#${u('a')})`} opacity="0.95" />
+      <path d="M17 15h20M18 19h17M19.500 23h13" stroke="#B8AEDC" strokeWidth="1.2" />
+      <circle cx="17" cy="35" r="3.600" fill="#FFFFFF" stroke="#5B3A12" strokeWidth="1.600" />
+      <circle cx="33" cy="35" r="3.600" fill="#FFFFFF" stroke="#5B3A12" strokeWidth="1.600" />
+    </svg>
+  );
+}
+
+export function WalletArt({ size = 40 }) {
+  const u = useIds();
+  return (
+    <svg className="art" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <defs>
+        <linearGradient id={u('a')} x1="6" y1="10" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#C98A3A" />
+          <stop offset="1" stopColor="#7A4414" />
+        </linearGradient>
+        <linearGradient id={u('b')} x1="30" y1="22" x2="44" y2="34" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFE680" />
+          <stop offset="1" stopColor="#E09A12" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="24" cy="43" rx="17" ry="3" fill="#05030F" opacity="0.4" />
+      <path d="M8 14l26-6 2 7z" fill="#E7C27A" stroke="#6B3C10" strokeWidth="1.400" />
+      <rect x="5" y="14" width="38" height="27" rx="6" fill={`url(#${u('a')})`} stroke="#4B2A0A" strokeWidth="1.800" />
+      <path d="M9 19h30" stroke="#F0C27A" strokeOpacity="0.5" strokeWidth="1.400" strokeDasharray="3 2.400" />
+      <rect x="28" y="23" width="17" height="11" rx="4" fill={`url(#${u('b')})`} stroke="#4B2A0A" strokeWidth="1.600" />
+      <circle cx="34" cy="28.500" r="2.200" fill="#4B2A0A" />
+    </svg>
   );
 }

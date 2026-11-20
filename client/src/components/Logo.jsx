@@ -1,3 +1,5 @@
+import { Crown } from './Crown.jsx';
+
 // Фирменный знак FARTU MASTI: объёмная масть-карта с градиентом и свечением.
 export function LogoMark({ size = 40 }) {
   return (
@@ -43,12 +45,12 @@ export function LogoMark({ size = 40 }) {
 
 export function Logo({ size = 'md', tagline = false }) {
   return (
-    <div className={`logo logo--${size}`}>
-      <LogoMark size={size === 'lg' ? 56 : size === 'sm' ? 30 : 38} />
+    <div className={`logo logo--${size} rd-logo`}>
+      <Crown size={size === 'lg' ? 54 : size === 'sm' ? 26 : 38} className="rd-logo__crown" />
       <div className="logo__text">
-        <span className="logo__word">
-          <span className="logo__part">FARTU</span>
-          <span className="logo__part logo__part--accent">MASTI</span>
+        <span className="logo__word rd-logo__word">
+          <span className="rd-logo__a">FARTU</span>
+          <span className="rd-logo__b">MASTI</span>
         </span>
         {tagline ? <span className="logo__tagline">карточная платформа</span> : null}
       </div>

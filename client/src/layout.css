@@ -526,7 +526,6 @@ button,
 .segmented__btn,
 .tabs__btn,
 .nav__item {
-  box-shadow: none !important;
   filter: none;
 }
 
@@ -1154,37 +1153,6 @@ input[type='number'] {
 .fm-wallet-hero__amount {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-/* 13.6 Кнопки без теней на всех экранах */
-button,
-[role='button'],
-.btn,
-.v2-btn,
-.v2-cta,
-.v2-tile,
-.v2-row,
-.v2-tab,
-.v2-seg__btn,
-.v3-cat,
-.v3-case__rates,
-.v3-case__buy,
-.fm-cta,
-.fm-chip,
-.fm-segment__btn,
-.fm-iconbtn,
-.fm-item__btn,
-.fm-row__action,
-.fm-nav__item,
-.fm-switch,
-.fm-rar__btn,
-.balance-chip,
-.balance-chip__plus,
-.segmented__btn,
-.tabs__btn,
-.nav__item {
-  box-shadow: none !important;
-  filter: none !important;
 }
 
 /* 13.7 Один уровень полей: отступ даёт только оболочка .app__main.

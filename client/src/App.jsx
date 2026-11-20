@@ -255,6 +255,11 @@ export default function App() {
     setTab('home');
   }, []);
 
+  const openSettings = useCallback(() => {
+    setOverlay(null);
+    setTab('profile');
+  }, []);
+
   const leaveRoom = useCallback(() => {
     send({ type: 'room:leave' });
     voiceRef.current?.reset();
@@ -265,7 +270,7 @@ export default function App() {
 
   if (phase === 'boot') {
     return (
-      <div className="splash">
+      <div className="splash rd-app">
         <Logo size="lg" tagline />
         <div className="spinner" />
         <p className="muted small">Загрузка стола…</p>
@@ -275,7 +280,7 @@ export default function App() {
 
   if (phase === 'auth' || !me) {
     return (
-      <div className="onboarding">
+      <div className="onboarding rd-app">
         <Logo size="lg" tagline />
         <p className="muted small" style={{ textAlign: 'center' }}>
           Вход выполняется автоматически через Telegram. Откройте приложение из бота FARTU MASTI.
@@ -352,9 +357,9 @@ export default function App() {
 
   if (overlay === 'withdraw' || overlay === 'inventory' || overlay === 'rules' || overlay === 'support') {
     return (
-      <div className="app">
+      <div className="app rd-app">
         <div className="app__bg" aria-hidden="true" />
-        <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} />
+        <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} onSettings={openSettings} />
         <main className="app__main">
           {overlay === 'withdraw' ? <Withdraw me={me.user} onBack={() => setOverlay(null)} /> : null}
           {overlay === 'inventory' ? (
@@ -377,10 +382,10 @@ export default function App() {
   const inRoom = Boolean(room);
 
   return (
-    <div className="app">
+    <div className="app rd-app">
       <div className="app__bg" aria-hidden="true" />
       {!inRoom ? (
-        <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} />
+        <TopBar user={me.user} connected={connected} onBalance={() => setBalanceOpen(true)} onSettings={openSettings} />
       ) : null}
 
       <main className={`app__main ${inRoom ? 'app__main--room' : ''}`}>
@@ -408,6 +413,7 @@ export default function App() {
                 onInventory={() => setOverlay('inventory')}
                 onSupport={() => setOverlay('support')}
                 onBalance={() => setBalanceOpen(true)}
+                onTab={setTab}
               />
             ) : null}
             {tab === 'shop' ? <Shop me={me.user} toast={toast} refreshMe={refreshMe} /> : null}

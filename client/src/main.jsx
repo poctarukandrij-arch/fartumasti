@@ -9,6 +9,7 @@ import './shop.css';
 import './v3.css';
 import './casino.css';
 import './layout.css';
+import './redesign.css';
 
 const container = document.getElementById('root');
 createRoot(container).render(

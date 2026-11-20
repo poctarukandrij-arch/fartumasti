@@ -1,6 +1,7 @@
 // Коллекционные банковские карты FARTU MASTI.
 // Каждая карта — своя палитра и свой фирменный знак (векторные формы, не плоский текст).
 import { useId } from 'react';
+import { ChestSprite } from './ChestSprite.jsx';
 
 export const BANKS = {
   sber: { name: 'Сбер', rarity: 'legendary', from: '#21A038', to: '#06622B', ink: '#ffffff', accent: '#8ef0b0' },
@@ -190,61 +191,9 @@ export function BankCardArt({ itemId, size = 168, className = '' }) {
   );
 }
 
-// Сундук кейса «Банковские карты»: тёмный кожаный кейс с веером карт.
+// Сундук кейса «Банковские карты»: иллюстрация из дизайн-референса.
 export function BankCaseArt({ size = 132 }) {
-  const raw = useId().replace(/[:]/g, '');
-  const id = (name) => `bc${raw}${name}`;
-  const height = Math.round((size * 0.92));
-  return (
-    <svg width={size} height={height} viewBox="0 0 160 148" role="img" aria-label="Кейс банковских карт">
-      <defs>
-        <linearGradient id={id('body')} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#2a1450" />
-          <stop offset="55%" stopColor="#170a2e" />
-          <stop offset="100%" stopColor="#0a0418" />
-        </linearGradient>
-        <linearGradient id={id('lid')} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#8b5cff" />
-          <stop offset="50%" stopColor="#3be8ff" />
-          <stop offset="100%" stopColor="#ff4d8d" />
-        </linearGradient>
-        <linearGradient id={id('c1')} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#21A038" />
-          <stop offset="100%" stopColor="#06622B" />
-        </linearGradient>
-        <linearGradient id={id('c2')} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FFDD2D" />
-          <stop offset="100%" stopColor="#D6AE00" />
-        </linearGradient>
-        <linearGradient id={id('c3')} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#EF3124" />
-          <stop offset="100%" stopColor="#8A030B" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="80" cy="132" rx="52" ry="9" fill="#05010c" opacity="0.6" />
-      <g transform="translate(30 12) rotate(-13 50 40)">
-        <rect width="72" height="46" rx="6" fill={`url(#${id('c1')})`} stroke="rgba(255,255,255,0.28)" />
-        <rect x="7" y="9" width="12" height="9" rx="2" fill="#e9d79a" />
-      </g>
-      <g transform="translate(56 6) rotate(7 50 40)">
-        <rect width="72" height="46" rx="6" fill={`url(#${id('c2')})`} stroke="rgba(255,255,255,0.3)" />
-        <rect x="7" y="9" width="12" height="9" rx="2" fill="#b99b2c" />
-      </g>
-      <g transform="translate(38 22) rotate(-2 50 40)">
-        <rect width="72" height="46" rx="6" fill={`url(#${id('c3')})`} stroke="rgba(255,255,255,0.32)" />
-        <rect x="7" y="9" width="12" height="9" rx="2" fill="#f0c9a0" />
-      </g>
-      <rect x="18" y="58" width="124" height="66" rx="12" fill={`url(#${id('body')})`} stroke="rgba(190,150,255,0.5)" strokeWidth="1.6" />
-      <rect x="18" y="58" width="124" height="16" rx="8" fill={`url(#${id('lid')})`} opacity="0.85" />
-      <rect x="66" y="80" width="28" height="20" rx="5" fill="#f4e3a4" stroke="#8d7327" />
-      <circle cx="80" cy="90" r="3.2" fill="#6b5518" />
-      <g fill="#ffffff" opacity="0.8">
-        <circle cx="132" cy="46" r="2" />
-        <circle cx="26" cy="42" r="1.6" />
-        <path d="M140 78l1.4 4 4 1.4-4 1.4-1.4 4-1.4-4-4-1.4 4-1.4 1.4-4z" />
-      </g>
-    </svg>
-  );
+  return <ChestSprite caseId="case_bankcards" size={size} label="Кейс банковских карт" />;
 }
 
 export default BankCardArt;
