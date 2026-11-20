@@ -1,0 +1,1550 @@
+From 0c367342ec9b0d22cea40481cdecdc5a5f75588f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 21 Nov 2026 01:28:33 +0300
+Subject: [PATCH] =?UTF-8?q?=D0=98=D1=81=D0=BF=D1=80=D0=B0=D0=B2=D0=BB?=
+ =?UTF-8?q?=D0=B5=D0=BD=D0=BE=20=D0=BF=D0=BE=D0=B2=D1=82=D0=BE=D1=80=D0=BD?=
+ =?UTF-8?q?=D0=BE=D0=B5=20=D0=BE=D1=82=D0=BA=D1=80=D1=8B=D1=82=D0=B8=D0=B5?=
+ =?UTF-8?q?=20=D0=BA=D0=B5=D0=B9=D1=81=D0=BE=D0=B2,=203D-=D0=BD=D0=B0?=
+ =?UTF-8?q?=D0=B3=D1=80=D0=B0=D0=B4=D1=8B=20=D0=B8=20=D0=BF=D1=80=D0=B5?=
+ =?UTF-8?q?=D0=B4=D0=BC=D0=B5=D1=82=D1=8B=20=D0=BC=D0=B0=D0=B3=D0=B0=D0=B7?=
+ =?UTF-8?q?=D0=B8=D0=BD=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- кейсы: рулетка анимируется заново на каждое открытие (Web Animations),
+  уникальный номер запуска отменяет старые таймеры, звук гасится по завершении,
+  закрытии (× / Esc) и размонтировании; параллельные открытия запрещены.
+  Награду по-прежнему определяет сервер.
+- новая 3D-подача награды (Reward3D): камера, вращение, свет, частицы,
+  отдельные сценарии для колод, столов, эмоций, эффектов и редкостей.
+- уникальные объёмные рисунки: 10 колод, 6 столов, 7 эмоций, 5 эффектов
+  (вместо системных эмодзи), в магазине, инвентаре, за столом.
+- главный экран компактнее, убраны лишние тени и выступающие фоны,
+  кнопка настроек и нижняя навигация обрезаются по границам,
+  окно «Ваш счёт» с золотой монетой. Платёжная логика не менялась.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011UUcmthf3SroDdbgn7R8hg
+---
+ client/src/components/Art.jsx          | 247 +--------
+ client/src/components/BalanceModal.jsx |   5 +-
+ client/src/components/Items3D.jsx      | 679 +++++++++++++++++++++++++
+ client/src/components/PlayerTag.jsx    |   8 +-
+ client/src/components/Seat.jsx         |   6 +-
+ client/src/items3d.css                 | 216 ++++++++
+ client/src/main.jsx                    |   1 +
+ client/src/screens/Home.jsx            |   3 +-
+ client/src/screens/Shop.jsx            | 128 +++--
+ 9 files changed, 1022 insertions(+), 271 deletions(-)
+ create mode 100644 client/src/components/Items3D.jsx
+ create mode 100644 client/src/items3d.css
+
+diff --git a/client/src/components/Art.jsx b/client/src/components/Art.jsx
+index 4ee35bf..e5d65ad 100644
+--- a/client/src/components/Art.jsx
++++ b/client/src/components/Art.jsx
+@@ -2,6 +2,21 @@
+ // Всё нарисовано векторно (SVG с градиентами и бликами) — без внешних файлов и эмодзи-заглушек.
+ import { useId } from 'react';
+ import { ChestSprite, chestSprite } from './ChestSprite.jsx';
++import { Deck3D, Table3D, Emoji3D, Effect3D } from './Items3D.jsx';
++
++// Предметы магазина рисуются в Items3D.jsx: у каждого свой объёмный рисунок.
++export function EffectArt({ id = 'effect_none', size = 56 }) {
++  return <Effect3D id={id} size={size} />;
++}
++export function EmojiArt({ id, size = 34 }) {
++  return <Emoji3D id={id} size={size} />;
++}
++export function DeckArt({ itemId = 'deck_graphite', size = 52 }) {
++  return <Deck3D itemId={itemId} size={size} />;
++}
++export function TableArt({ itemId = 'table_graphite', size = 56 }) {
++  return <Table3D itemId={itemId} size={size} />;
++}
+ 
+ function useIds() {
+   const raw = useId().replace(/[:]/g, '');
+@@ -345,238 +360,6 @@ export function ChestArt({ theme: themeId = 'case_bank', size = 120, open = fals
+   );
+ }
+ 
+-/* ────────────────────────────── эффекты появления ────────────────────────────── */
+-
+-export function EffectArt({ id = 'effect_none', size = 56 }) {
+-  const u = useIds();
+-  const common = (
+-    <defs>
+-      <linearGradient id={u('a')} x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+-        <stop offset="0" stopColor="#C7B6FF" />
+-        <stop offset="0.5" stopColor="#8B5CF6" />
+-        <stop offset="1" stopColor="#4338CA" />
+-      </linearGradient>
+-      <linearGradient id={u('b')} x1="20" y1="12" x2="44" y2="50" gradientUnits="userSpaceOnUse">
+-        <stop offset="0" stopColor="#A5F3FC" />
+-        <stop offset="0.55" stopColor="#22D3EE" />
+-        <stop offset="1" stopColor="#1D4ED8" />
+-      </linearGradient>
+-      <linearGradient id={u('c')} x1="16" y1="14" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+-        <stop offset="0" stopColor="#FFC7E4" />
+-        <stop offset="0.55" stopColor="#F472B6" />
+-        <stop offset="1" stopColor="#9D174D" />
+-      </linearGradient>
+-    </defs>
+-  );
+-
+-  if (id === 'effect_ripple') {
+-    return (
+-      <svg className="art art--effect" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-        {common}
+-        <ellipse cx="32" cy="54" rx="16" ry="3.4" fill="#05030F" opacity="0.4" />
+-        <circle cx="32" cy="32" r="22" fill="none" stroke={`url(#${u('b')})`} strokeWidth="2.4" opacity="0.45" />
+-        <circle cx="32" cy="32" r="15.5" fill="none" stroke={`url(#${u('b')})`} strokeWidth="3" opacity="0.75" />
+-        <circle cx="32" cy="32" r="9" fill={`url(#${u('b')})`} />
+-        <circle cx="29" cy="29" r="2.6" fill="#FFFFFF" fillOpacity="0.8" />
+-      </svg>
+-    );
+-  }
+-
+-  if (id === 'effect_glitch') {
+-    return (
+-      <svg className="art art--effect" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-        {common}
+-        <ellipse cx="32" cy="55" rx="14" ry="3" fill="#05030F" opacity="0.4" />
+-        <rect x="16" y="16" width="32" height="32" rx="7" fill={`url(#${u('a')})`} opacity="0.9" />
+-        <rect x="12" y="22" width="12" height="5" rx="2.5" fill={`url(#${u('b')})`} opacity="0.9" />
+-        <rect x="38" y="33" width="14" height="5" rx="2.5" fill={`url(#${u('c')})`} opacity="0.9" />
+-        <rect x="22" y="40" width="16" height="4" rx="2" fill="#FFFFFF" opacity="0.55" />
+-        <path d="M24 26h7M33 30h6" stroke="#0B0620" strokeWidth="2.6" strokeLinecap="round" opacity="0.65" />
+-      </svg>
+-    );
+-  }
+-
+-  if (id === 'effect_lightning') {
+-    return (
+-      <svg className="art art--effect" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-        {common}
+-        <ellipse cx="32" cy="56" rx="13" ry="3" fill="#05030F" opacity="0.4" />
+-        <path d="M38 6 18 34h11l-3.5 24L46 28H34.5Z" fill={`url(#${u('b')})`} />
+-        <path d="M36 10 23 30h8l-1.6 10" stroke="#FFFFFF" strokeOpacity="0.75" strokeWidth="2" fill="none" strokeLinecap="round" />
+-      </svg>
+-    );
+-  }
+-
+-  if (id === 'effect_phoenix') {
+-    return (
+-      <svg className="art art--effect" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-        {common}
+-        <ellipse cx="32" cy="56" rx="15" ry="3.2" fill="#05030F" opacity="0.4" />
+-        <path d="M32 10c3 6 4 10 4 14 0 3-1.6 5.4-4 5.4S28 27 28 24c0-4 1-8 4-14Z" fill={`url(#${u('c')})`} />
+-        <path d="M32 22c6-4 14-4 20 1-6 1-9 4-11 8-3-4-6-6-9-9Z" fill={`url(#${u('a')})`} opacity="0.95" />
+-        <path d="M32 22c-6-4-14-4-20 1 6 1 9 4 11 8 3-4 6-6 9-9Z" fill={`url(#${u('a')})`} opacity="0.95" />
+-        <path d="M32 30c4 4 6 9 6 15H26c0-6 2-11 6-15Z" fill={`url(#${u('c')})`} />
+-        <path d="M32 34c1.6 3 2.4 6.4 2.4 10h-4.8c0-3.6.8-7 2.4-10Z" fill="#FFE9F4" fillOpacity="0.8" />
+-      </svg>
+-    );
+-  }
+-
+-  return (
+-    <svg className="art art--effect" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-      {common}
+-      <ellipse cx="32" cy="54" rx="14" ry="3" fill="#05030F" opacity="0.35" />
+-      <circle cx="32" cy="32" r="14" fill="none" stroke="#6B5BA8" strokeWidth="2.4" strokeDasharray="4 5" />
+-      <path d="M32 24v16M24 32h16" stroke="#6B5BA8" strokeWidth="2.6" strokeLinecap="round" />
+-    </svg>
+-  );
+-}
+-
+-/* ────────────────────────────── эмодзи-предметы ────────────────────────────── */
+-
+-const EMOJI_ART = {
+-  emoji_fire: {
+-    g: ['#FFD3A5', '#FB7185', '#B91C1C'],
+-    d: 'M32 6c1 8 7 10 9.5 15.5C44 27 42 32 38 35c1.5-5-1-8-3-9.5.6 5-1.6 8-5 9.5-3.4-1.5-5.6-4.5-5-9.5-2 1.5-4.5 4.5-3 9.5-4-3-6-8-3.5-13.5C21 15 30 14 32 6Z',
+-  },
+-  emoji_ice: {
+-    g: ['#E0F7FF', '#67E8F9', '#1D4ED8'],
+-    d: 'M32 4l6 12 13-3-8 12 8 12-13-3-6 12-6-12-13 3 8-12-8-12 13 3Z',
+-  },
+-  emoji_skull: {
+-    g: ['#F8FAFF', '#C7CBE0', '#5B5F7A'],
+-    d: 'M32 6c11 0 18 7.6 18 17 0 6-3 9-6 11v6a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4v-6c-3-2-6-5-6-11C14 13.6 21 6 32 6Z',
+-  },
+-  emoji_snake: {
+-    g: ['#BBF7D0', '#34D399', '#047857'],
+-    d: 'M44 12c-8-2-16 2-16 8s8 8 8 14-6 10-14 8c-4-1-7-4-7-8 0-3 2-5 5-5s5 2 5 5c0 1-.4 2-1 2.5 2 1 4 .4 4-2 0-4-8-6-8-13S30 4 44 12Z',
+-  },
+-  emoji_bolt: {
+-    g: ['#C7F9FF', '#38BDF8', '#1D4ED8'],
+-    d: 'M38 4 16 36h12l-4 24 24-32H36Z',
+-  },
+-  emoji_rocket: {
+-    g: ['#FFD9E6', '#F472B6', '#7C3AED'],
+-    d: 'M32 4c9 6 13 15 13 24l6 8-9 1-3 9-7-7-7 7-3-9-9-1 6-8C19 19 23 10 32 4Z',
+-  },
+-  emoji_diamond: {
+-    g: ['#E4DBFF', '#A78BFA', '#4C1D95'],
+-    d: 'M32 6 52 22 32 58 12 22Z',
+-  },
+-};
+-
+-export function EmojiArt({ id, size = 34 }) {
+-  const u = useIds();
+-  const art = EMOJI_ART[id];
+-  if (!art) return null;
+-  return (
+-    <svg className="art art--emoji" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-      <defs>
+-        <linearGradient id={u('a')} x1="14" y1="6" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+-          <stop offset="0" stopColor={art.g[0]} />
+-          <stop offset="0.55" stopColor={art.g[1]} />
+-          <stop offset="1" stopColor={art.g[2]} />
+-        </linearGradient>
+-      </defs>
+-      <ellipse cx="32" cy="57" rx="15" ry="3.2" fill="#05030F" opacity="0.4" />
+-      <path d={art.d} fill={`url(#${u('a')})`} stroke="#FFFFFF" strokeOpacity="0.45" strokeWidth="1.4" />
+-      <path d={art.d} fill="none" stroke="#0B0620" strokeOpacity="0.25" strokeWidth="1" transform="translate(0.8 1.2)" />
+-      {id === 'emoji_skull' ? (
+-        <>
+-          <ellipse cx="25.5" cy="26" rx="4.4" ry="5" fill="#221B3A" />
+-          <ellipse cx="38.5" cy="26" rx="4.4" ry="5" fill="#221B3A" />
+-          <path d="M28 36h8v7h-8z" fill="#221B3A" opacity="0.6" />
+-        </>
+-      ) : null}
+-      {id === 'emoji_diamond' ? (
+-        <>
+-          <path d="M32 6 32 58 12 22Z" fill="#FFFFFF" fillOpacity="0.22" />
+-          <path d="M20 20h24" stroke="#FFFFFF" strokeOpacity="0.45" strokeWidth="1.4" />
+-        </>
+-      ) : null}
+-      {id === 'emoji_rocket' ? (
+-        <circle cx="32" cy="26" r="5.4" fill="#FFFFFF" fillOpacity="0.85" />
+-      ) : null}
+-      {id === 'emoji_snake' ? (
+-        <circle cx="44" cy="14" r="2.6" fill="#052E1B" />
+-      ) : null}
+-    </svg>
+-  );
+-}
+-
+-/* ────────────────────────────── колоды и столы ────────────────────────────── */
+-
+-const DECK_ART = {
+-  deck_graphite: ['#8E8AB8', '#4A4670', '#1B1830'],
+-  deck_neon: ['#C4B5FD', '#7C4DFF', '#2B1160'],
+-  deck_ice: ['#D6F6FF', '#38BDF8', '#0C4A6E'],
+-  deck_crimson: ['#FFC9D4', '#F43F5E', '#6B0F24'],
+-  deck_matrix: ['#C6FFE4', '#22C55E', '#064E3B'],
+-  deck_void: ['#B9A6FF', '#4C1D95', '#12061F'],
+-  deck_steel: ['#E7ECF5', '#94A3B8', '#334155'],
+-  deck_card_steel: ['#E7ECF5', '#94A3B8', '#334155'],
+-  deck_card_signal: ['#C9F5FF', '#22D3EE', '#0E5C74'],
+-  deck_card_titan: ['#FFE0C2', '#FB923C', '#7C2D12'],
+-  deck_card_black: ['#A9A6C4', '#312E45', '#0A0912'],
+-};
+-
+-export function DeckArt({ itemId = 'deck_graphite', size = 52 }) {
+-  const u = useIds();
+-  const tones = DECK_ART[itemId] || DECK_ART.deck_graphite;
+-  return (
+-    <svg className="art art--deck" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-      <defs>
+-        <linearGradient id={u('a')} x1="12" y1="10" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+-          <stop offset="0" stopColor={tones[0]} />
+-          <stop offset="0.5" stopColor={tones[1]} />
+-          <stop offset="1" stopColor={tones[2]} />
+-        </linearGradient>
+-      </defs>
+-      <ellipse cx="32" cy="57" rx="17" ry="3.2" fill="#05030F" opacity="0.4" />
+-      <rect x="14" y="14" width="34" height="42" rx="6" fill="#0B0820" opacity="0.8" transform="rotate(-9 31 35)" />
+-      <rect x="17" y="10" width="34" height="42" rx="6" fill={`url(#${u('a')})`} transform="rotate(6 34 31)" />
+-      <rect x="17" y="10" width="34" height="42" rx="6" fill="none" stroke="#FFFFFF" strokeOpacity="0.4" transform="rotate(6 34 31)" />
+-      <path
+-        d="M34 20c1.4 6.6 3.4 8.6 10 10-6.6 1.4-8.6 3.4-10 10-1.4-6.6-3.4-8.6-10-10 6.6-1.4 8.6-3.4 10-10Z"
+-        fill="#FFFFFF"
+-        fillOpacity="0.75"
+-        transform="rotate(6 34 31)"
+-      />
+-    </svg>
+-  );
+-}
+-
+-const TABLE_ART = {
+-  table_graphite: ['#6B688C', '#2A2740', '#12101F'],
+-  table_emerald: ['#6EE7B7', '#059669', '#052E1F'],
+-  table_ocean: ['#7DD3FC', '#0284C7', '#062A44'],
+-  table_aurora: ['#C4B5FD', '#22D3EE', '#1E1B4B'],
+-  table_lava: ['#FDBA74', '#EA580C', '#451A03'],
+-  table_midnight: ['#A5B4FC', '#3730A3', '#0B0A24'],
+-};
+-
+-export function TableArt({ itemId = 'table_graphite', size = 56 }) {
+-  const u = useIds();
+-  const tones = TABLE_ART[itemId] || TABLE_ART.table_graphite;
+-  return (
+-    <svg className="art art--tableart" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+-      <defs>
+-        <radialGradient id={u('a')} cx="0.5" cy="0.35" r="0.75">
+-          <stop offset="0" stopColor={tones[0]} />
+-          <stop offset="0.6" stopColor={tones[1]} />
+-          <stop offset="1" stopColor={tones[2]} />
+-        </radialGradient>
+-      </defs>
+-      <ellipse cx="32" cy="55" rx="20" ry="4" fill="#05030F" opacity="0.45" />
+-      <ellipse cx="32" cy="34" rx="26" ry="17" fill="#120E22" />
+-      <ellipse cx="32" cy="32" rx="26" ry="17" fill={`url(#${u('a')})`} />
+-      <ellipse cx="32" cy="32" rx="26" ry="17" fill="none" stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="1.6" />
+-      <ellipse cx="32" cy="32" rx="17" ry="10" fill="none" stroke="#FFFFFF" strokeOpacity="0.2" strokeWidth="1.2" strokeDasharray="3 4" />
+-      <rect x="24" y="24" width="10" height="14" rx="2.2" fill="#FFFFFF" fillOpacity="0.9" transform="rotate(-10 29 31)" />
+-      <rect x="30" y="26" width="10" height="14" rx="2.2" fill="#FFFFFF" fillOpacity="0.75" transform="rotate(8 35 33)" />
+-    </svg>
+-  );
+-}
+-
+ /* ────────────────────────────── СБП ────────────────────────────── */
+ 
+ export function SbpMark({ size = 28 }) {
+diff --git a/client/src/components/BalanceModal.jsx b/client/src/components/BalanceModal.jsx
+index a74f4b7..01ea278 100644
+--- a/client/src/components/BalanceModal.jsx
++++ b/client/src/components/BalanceModal.jsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useMemo, useState } from 'react';
+-import { CoinArt, SbpMark, Sparkle } from './Art.jsx';
++import { SbpMark, Sparkle } from './Art.jsx';
++import { RefIcon } from './RefIcon.jsx';
+ import { haptic } from '../telegram.js';
+ 
+ const PRESETS = [500, 1000, 2500, 5000];
+@@ -66,7 +67,7 @@ export function BalanceModal({ open, user, onClose, toast }) {
+ 
+         <div className={`fm-wallet-hero ${unlimited ? 'fm-wallet-hero--unlimited' : ''}`}>
+           <span className="fm-wallet-hero__coin" aria-hidden="true">
+-            <CoinArt size={46} />
++            <RefIcon name="coin" height={56} />
+           </span>
+           <div className="fm-wallet-hero__body">
+             <span className="fm-wallet-hero__amount">
+diff --git a/client/src/components/Items3D.jsx b/client/src/components/Items3D.jsx
+new file mode 100644
+index 0000000..7f0cb1a
+--- /dev/null
++++ b/client/src/components/Items3D.jsx
+@@ -0,0 +1,679 @@
++// Объёмная векторная графика предметов магазина: колоды, столы, эмоции, эффекты.
++// У каждого предмета собственный рисунок (а не перекраска общего шаблона).
++// Анимации — только transform/opacity (см. items3d.css), чтобы не нагружать телефон.
++import { useId } from 'react';
++
++function useUid() {
++  const raw = useId().replace(/[:]/g, '');
++  return (name) => `i3${raw}${name}`;
++}
++
++/* ───────────────────────────── КОЛОДЫ ───────────────────────────── */
++
++// Палитра + рисунок рубашки в локальных координатах карты 64×96.
++const DECKS = {
++  deck_graphite: { c: ['#4a4962', '#23222f', '#121119'], edge: '#aeb0c8' },
++  deck_steel: { c: ['#e3e8f2', '#8a94a8', '#434c5e'], edge: '#f4f7fc' },
++  deck_neon: { c: ['#101c3f', '#0a1230', '#050a1c'], edge: '#4f8cff' },
++  deck_ice: { c: ['#effbff', '#7fd6f5', '#1b6a97'], edge: '#ffffff' },
++  deck_crimson: { c: ['#7a1230', '#46091c', '#1c0410'], edge: '#ff7a95' },
++  deck_matrix: { c: ['#05190f', '#031009', '#010603'], edge: '#3ddc97' },
++  deck_void: { c: ['#241048', '#0c0620', '#030208'], edge: '#a855f7' },
++  deck_card_signal: { c: ['#2563c9', '#14397d', '#0a1d45'], edge: '#7fd0ff' },
++  deck_card_steel: { c: ['#e3e8f2', '#8a94a8', '#434c5e'], edge: '#f4f7fc' },
++  deck_card_titan: { c: ['#7a808f', '#3b3f4a', '#1b1d24'], edge: '#ffb27a' },
++  deck_card_black: { c: ['#17171c', '#0a0a0d', '#000000'], edge: '#ff4d6d' },
++};
++
++function DeckMotif({ id, u }) {
++  switch (id) {
++    case 'deck_graphite':
++      return (
++        <>
++          <pattern id={u('w')} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
++            <rect width="8" height="8" fill="none" />
++            <rect width="4" height="8" fill="#ffffff" opacity="0.07" />
++            <rect x="4" width="4" height="8" fill="#000000" opacity="0.18" />
++          </pattern>
++          <rect width="64" height="96" fill={`url(#${u('w')})`} />
++          <path d="M32 26 46 48 32 70 18 48Z" fill="none" stroke="#b9bbd2" strokeWidth="1.6" />
++          <path d="M32 33 40 48 32 63 24 48Z" fill="#b9bbd2" opacity="0.28" />
++          <circle cx="32" cy="48" r="3" fill="#e4e6f4" />
++        </>
++      );
++    case 'deck_steel':
++    case 'deck_card_steel':
++      return (
++        <>
++          {Array.from({ length: 24 }, (_, i) => (
++            <rect key={i} x="0" y={4 + i * 4} width="64" height="0.7" fill="#ffffff" opacity={i % 3 === 0 ? 0.35 : 0.14} />
++          ))}
++          <circle cx="32" cy="48" r="17" fill="none" stroke="#3b4456" strokeWidth="2.2" />
++          <circle cx="32" cy="48" r="11" fill="#c7cfdf" stroke="#4a5468" strokeWidth="1.4" />
++          <path d="M32 40 36 48 32 56 28 48Z" fill="#4a5468" />
++          {[[7, 7], [57, 7], [7, 89], [57, 89]].map(([x, y]) => (
++            <g key={`${x}${y}`}>
++              <circle cx={x} cy={y} r="2.6" fill="#d9deea" stroke="#4a5468" strokeWidth="0.9" />
++              <path d={`M${x - 1.6} ${y}h3.2`} stroke="#4a5468" strokeWidth="0.8" />
++            </g>
++          ))}
++        </>
++      );
++    case 'deck_neon':
++      return (
++        <>
++          <rect x="5" y="5" width="54" height="86" rx="5" fill="none" stroke="#4f8cff" strokeWidth="1.6" filter={`url(#${u('g')})`} />
++          <path d="M5 30h14l6 8h14M59 66H45l-6-8H25M32 5v18M32 91V73" fill="none" stroke="#2fd0ff" strokeWidth="1.4" opacity="0.9" />
++          {[[19, 30], [39, 38], [45, 66], [25, 58]].map(([x, y]) => (
++            <circle key={`${x}${y}`} cx={x} cy={y} r="2" fill="#aef" filter={`url(#${u('g')})`} />
++          ))}
++          <path d="M32 33 44 40.500v15L32 63 20 55.500v-15Z" fill="#4f8cff" fillOpacity="0.18" stroke="#7fd0ff" strokeWidth="1.8" filter={`url(#${u('g')})`} />
++          <circle cx="32" cy="48" r="3.4" fill="#e6f7ff" />
++        </>
++      );
++    case 'deck_ice':
++      return (
++        <>
++          <path d="M0 0 30 22 0 44ZM64 0V38L38 20ZM0 96V60l26 14ZM64 96H36l14-30 14 8ZM30 22 38 20 64 38 40 52 26 74 0 60 0 44Z" fill="#ffffff" opacity="0.32" />
++          <path d="M30 22 40 52 26 74M38 20 40 52 64 38" fill="none" stroke="#ffffff" strokeWidth="0.9" opacity="0.7" />
++          {[0, 60, 120].map((r) => (
++            <g key={r} transform={`rotate(${r} 32 48)`}>
++              <path d="M32 28v40M28 33l4 4 4-4M28 63l4-4 4 4" fill="none" stroke="#0e5f8d" strokeWidth="1.8" strokeLinecap="round" />
++            </g>
++          ))}
++          <circle cx="32" cy="48" r="3" fill="#ffffff" />
++        </>
++      );
++    case 'deck_crimson':
++      return (
++        <>
++          <pattern id={u('d')} width="16" height="16" patternUnits="userSpaceOnUse">
++            <path d="M8 1c2 3 2 5 0 7-2-2-2-4 0-7ZM8 8c3 2 5 2 7 0-2-2-4-2-7 0ZM8 8c-3 2-5 2-7 0 2-2 4-2 7 0ZM8 8c2 3 2 5 0 7-2-2-2-4 0-7Z" fill="#ff7a95" opacity="0.22" />
++          </pattern>
++          <rect width="64" height="96" fill={`url(#${u('d')})`} />
++          <rect x="4" y="4" width="56" height="88" rx="4" fill="none" stroke="#ff7a95" strokeWidth="1" opacity="0.8" />
++          <path d="M32 28c4 6 4 10 0 14 4 0 8 0 12 4-4 2-8 2-12 6 4 4 4 8 0 14-4-6-4-10 0-14-4-4-8-4-12-6 4-4 8-4 12-4-4-4-4-8 0-14Z" fill="#c21c44" stroke="#ff9db1" strokeWidth="1.2" />
++          <circle cx="32" cy="48" r="3.6" fill="#ffd3dc" />
++        </>
++      );
++    case 'deck_matrix':
++      return (
++        <>
++          {Array.from({ length: 12 }, (_, i) => {
++            const x = 4 + i * 5;
++            const len = 3 + ((i * 7) % 9);
++            return (
++              <g key={i}>
++                {Array.from({ length: len }, (__, j) => (
++                  <rect
++                    key={j}
++                    x={x}
++                    y={4 + ((i * 13) % 30) + j * 6}
++                    width="3"
++                    height="4"
++                    rx="0.6"
++                    fill="#3ddc97"
++                    opacity={Math.max(0.12, 1 - (len - j) * 0.13)}
++                  />
++                ))}
++              </g>
++            );
++          })}
++          <rect x="18" y="36" width="28" height="24" rx="3" fill="#010603" stroke="#3ddc97" strokeWidth="1.6" filter={`url(#${u('g')})`} />
++          <path d="M23 44h18M23 48h12M23 52h15" stroke="#7affc6" strokeWidth="1.5" strokeLinecap="round" />
++        </>
++      );
++    case 'deck_void':
++      return (
++        <>
++          <radialGradient id={u('v')} cx="0.5" cy="0.5" r="0.5">
++            <stop offset="0" stopColor="#000" />
++            <stop offset="0.55" stopColor="#000" />
++            <stop offset="0.7" stopColor="#7c3aed" />
++            <stop offset="1" stopColor="#7c3aed" stopOpacity="0" />
++          </radialGradient>
++          {[30, 24, 18, 12].map((r, i) => (
++            <ellipse key={r} cx="32" cy="48" rx={r} ry={r * 0.62} fill="none" stroke="#a855f7" strokeWidth="1.1" opacity={0.25 + i * 0.18} transform={`rotate(${-24 + i * 14} 32 48)`} />
++          ))}
++          <circle cx="32" cy="48" r="17" fill={`url(#${u('v')})`} />
++          <circle cx="32" cy="48" r="7.500" fill="#000" stroke="#c4a1ff" strokeWidth="1.2" />
++          {[[10, 14], [52, 20], [48, 80], [14, 74], [24, 8]].map(([x, y], i) => (
++            <circle key={i} cx={x} cy={y} r="1.1" fill="#d8c4ff" />
++          ))}
++        </>
++      );
++    case 'deck_card_signal':
++      return (
++        <>
++          {[40, 30, 20, 10].map((r) => (
++            <path key={r} d={`M64 96a${r + 20} ${r + 20} 0 0 0-${r + 20}-${r + 20}`} fill="none" stroke="#7fd0ff" strokeWidth="1.4" opacity={0.18 + (40 - r) * 0.012} transform="translate(0 -8)" />
++          ))}
++          <rect x="10" y="30" width="22" height="17" rx="3.500" fill="#e9c872" stroke="#a5843a" strokeWidth="1" />
++          <path d="M10 38.500h22M21 30v17" stroke="#a5843a" strokeWidth="0.9" />
++          <path d="M40 34c4 3 4 9 0 12M45 31c6 5 6 13 0 18" fill="none" stroke="#e8f6ff" strokeWidth="1.6" strokeLinecap="round" />
++          <rect x="10" y="62" width="30" height="2.600" rx="1.300" fill="#e8f6ff" opacity="0.8" />
++          <rect x="10" y="68" width="18" height="2.600" rx="1.300" fill="#e8f6ff" opacity="0.5" />
++        </>
++      );
++    case 'deck_card_titan':
++      return (
++        <>
++          <pattern id={u('h')} width="14" height="12" patternUnits="userSpaceOnUse">
++            <path d="M3.500 0 10.500 0 14 6 10.500 12 3.500 12 0 6Z" fill="none" stroke="#ffffff" strokeOpacity="0.16" strokeWidth="0.8" />
++          </pattern>
++          <rect width="64" height="96" fill={`url(#${u('h')})`} />
++          <path d="M32 24 50 36v24L32 72 14 60V36Z" fill="#2a2d36" stroke="#ffb27a" strokeWidth="1.8" />
++          <path d="M32 32 43 39v18L32 64 21 57V39Z" fill="#ffb27a" opacity="0.2" stroke="#ffd2b0" strokeWidth="1" />
++          <path d="M24 44h16M24 50h16M24 56h16" stroke="#ffd2b0" strokeWidth="2" strokeLinecap="round" />
++        </>
++      );
++    case 'deck_card_black':
++      return (
++        <>
++          <rect x="4" y="4" width="56" height="88" rx="4" fill="none" stroke="#ff4d6d" strokeWidth="0.9" opacity="0.9" />
++          {[[4, 4], [60, 4], [4, 92], [60, 92]].map(([x, y]) => (
++            <circle key={`${x}${y}`} cx={x} cy={y} r="1.600" fill="#ff4d6d" />
++          ))}
++          <circle cx="32" cy="46" r="13" fill="none" stroke="#2c2c34" strokeWidth="2.600" />
++          <circle cx="32" cy="46" r="13" fill="none" stroke="#ff4d6d" strokeWidth="1" strokeDasharray="3 5" />
++          <rect x="27" y="41" width="10" height="10" rx="2" fill="#18181e" stroke="#ff4d6d" strokeWidth="0.9" />
++          <rect x="10" y="76" width="22" height="2.400" rx="1.200" fill="#ff4d6d" opacity="0.7" />
++        </>
++      );
++    default:
++      return null;
++  }
++}
++
++function DeckFace({ id, u, glossy = true }) {
++  const d = DECKS[id] || DECKS.deck_graphite;
++  return (
++    <>
++      <linearGradient id={u('base')} x1="0" y1="0" x2="1" y2="1">
++        <stop offset="0" stopColor={d.c[0]} />
++        <stop offset="0.55" stopColor={d.c[1]} />
++        <stop offset="1" stopColor={d.c[2]} />
++      </linearGradient>
++      <clipPath id={u('clip')}>
++        <rect width="64" height="96" rx="7" />
++      </clipPath>
++      <g clipPath={`url(#${u('clip')})`}>
++        <rect width="64" height="96" fill={`url(#${u('base')})`} />
++        <DeckMotif id={id} u={u} />
++        {glossy ? <path d="M0 0H64V30C44 40 20 36 0 52Z" fill="#fff" opacity="0.11" /> : null}
++      </g>
++      <rect width="64" height="96" rx="7" fill="none" stroke={d.edge} strokeOpacity="0.85" strokeWidth="1.6" />
++      <rect x="1.500" y="1.500" width="61" height="93" rx="5.500" fill="none" stroke="#000" strokeOpacity="0.35" strokeWidth="0.8" />
++    </>
++  );
++}
++
++export function Deck3D({ itemId = 'deck_graphite', size = 52 }) {
++  const u = useUid();
++  return (
++    <span className="i3 i3--deck" style={{ width: size, height: size }} data-item={itemId}>
++      <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
++        <defs>
++          <filter id={u('g')} x="-30%" y="-30%" width="160%" height="160%">
++            <feGaussianBlur stdDeviation="1.4" result="b" />
++            <feMerge>
++              <feMergeNode in="b" />
++              <feMergeNode in="SourceGraphic" />
++            </feMerge>
++          </filter>
++        </defs>
++        <ellipse cx="50" cy="94" rx="30" ry="4.500" fill="#000" opacity="0.45" />
++        <g className="i3__card i3__card--back" transform="translate(14 9) rotate(-11 32 48) scale(0.86)">
++          <rect x="3" y="4" width="64" height="96" rx="7" fill="#000" opacity="0.45" />
++          <DeckFace id={itemId} u={(n) => u(`b${n}`)} glossy={false} />
++          <rect width="64" height="96" rx="7" fill="#000" opacity="0.38" />
++        </g>
++        <g className="i3__card i3__card--front" transform="translate(26 5) rotate(5 32 48) scale(0.9)">
++          <rect x="3" y="5" width="64" height="96" rx="7" fill="#000" opacity="0.5" />
++          <DeckFace id={itemId} u={(n) => u(`f${n}`)} />
++        </g>
++      </svg>
++    </span>
++  );
++}
++
++/* ───────────────────────────── СТОЛЫ ───────────────────────────── */
++
++const TABLES = {
++  table_graphite: { rim: ['#8a8aa6', '#3a3950', '#1b1a28'], felt: ['#34344a', '#17171f'], glow: '#8e8ab8' },
++  table_emerald: { rim: ['#f0d58a', '#b08a2e', '#5b4310'], felt: ['#18a06f', '#07311f'], glow: '#34e0a0' },
++  table_ocean: { rim: ['#e6f6ff', '#6fb6e6', '#1b4f80'], felt: ['#1f7fcf', '#082a52'], glow: '#4fc3ff' },
++  table_aurora: { rim: ['#d9ccff', '#7c5cff', '#2a1f66'], felt: ['#1b2250', '#0a0e26'], glow: '#9d7cff' },
++  table_lava: { rim: ['#6a3a2e', '#2d1713', '#120806'], felt: ['#2a1410', '#0f0605'], glow: '#ff6a2e' },
++  table_midnight: { rim: ['#c79bff', '#6a35c4', '#1c0b3a'], felt: ['#0d0d16', '#030306'], glow: '#a855f7' },
++};
++
++function TableSurface({ id, u }) {
++  switch (id) {
++    case 'table_graphite':
++      return (
++        <>
++          {Array.from({ length: 14 }, (_, i) => (
++            <path key={i} d={`M${14 + i * 7} 62 ${34 + i * 7} 18`} stroke="#fff" strokeOpacity="0.045" strokeWidth="1.6" />
++          ))}
++          <ellipse cx="60" cy="38" rx="30" ry="15" fill="none" stroke="#8e8ab8" strokeOpacity="0.4" strokeWidth="1" strokeDasharray="2 3" />
++        </>
++      );
++    case 'table_emerald':
++      return (
++        <>
++          <pattern id={u('f')} width="3" height="3" patternUnits="userSpaceOnUse">
++            <circle cx="1" cy="1" r="0.55" fill="#fff" opacity="0.13" />
++          </pattern>
++          <ellipse cx="60" cy="38" rx="46" ry="26" fill={`url(#${u('f')})`} />
++          <ellipse cx="60" cy="38" rx="31" ry="16" fill="none" stroke="#f0d58a" strokeOpacity="0.7" strokeWidth="1" />
++          <path d="M60 30 63 38 60 46 57 38Z" fill="#f0d58a" opacity="0.8" />
++        </>
++      );
++    case 'table_ocean':
++      return (
++        <>
++          {[24, 34, 44, 54].map((y, i) => (
++            <path key={y} d={`M16 ${y}q11 -7 22 0t22 0t22 0t22 0`} fill="none" stroke="#e6f6ff" strokeOpacity={0.5 - i * 0.07} strokeWidth="1.5" strokeLinecap="round" />
++          ))}
++          <circle cx="40" cy="30" r="1.4" fill="#fff" />
++          <circle cx="82" cy="46" r="1.2" fill="#fff" />
++        </>
++      );
++    case 'table_aurora':
++      return (
++        <>
++          <linearGradient id={u('au1')} x1="0" x2="1">
++            <stop offset="0" stopColor="#22d3ee" stopOpacity="0" />
++            <stop offset="0.5" stopColor="#22d3ee" />
++            <stop offset="1" stopColor="#7c5cff" stopOpacity="0" />
++          </linearGradient>
++          <linearGradient id={u('au2')} x1="0" x2="1">
++            <stop offset="0" stopColor="#c084fc" stopOpacity="0" />
++            <stop offset="0.5" stopColor="#c084fc" />
++            <stop offset="1" stopColor="#34e0a0" stopOpacity="0" />
++          </linearGradient>
++          <path d="M14 46C34 22 52 56 74 30s28-4 34 2" fill="none" stroke={`url(#${u('au1')})`} strokeWidth="6" opacity="0.8" strokeLinecap="round" />
++          <path d="M18 56C40 34 60 62 84 40s20-4 26-2" fill="none" stroke={`url(#${u('au2')})`} strokeWidth="4" opacity="0.7" strokeLinecap="round" />
++          {[[30, 24], [50, 18], [88, 24], [96, 46], [40, 54], [70, 56]].map(([x, y], i) => (
++            <circle key={i} cx={x} cy={y} r="0.9" fill="#fff" />
++          ))}
++        </>
++      );
++    case 'table_lava':
++      return (
++        <>
++          <path d="M30 36 44 30 54 40 66 28 80 40 92 32M54 40 50 52 62 58M80 40 84 52" fill="none" stroke="#ff6a2e" strokeWidth="2.200" strokeLinecap="round" strokeLinejoin="round" />
++          <path d="M30 36 44 30 54 40 66 28 80 40 92 32M54 40 50 52 62 58M80 40 84 52" fill="none" stroke="#ffd36a" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
++          {[[38, 48], [72, 24], [94, 46], [26, 28]].map(([x, y], i) => (
++            <circle key={i} cx={x} cy={y} r="1.3" fill="#ffb066" />
++          ))}
++        </>
++      );
++    case 'table_midnight':
++      return (
++        <>
++          {[[30, 24], [48, 16], [76, 20], [92, 36], [88, 52], [44, 54], [24, 42], [64, 58]].map(([x, y], i) => (
++            <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 1.2 : 0.8} fill="#e8d6ff" opacity="0.9" />
++          ))}
++          <path d="M46 30a10 10 0 1 0 10 14 8 8 0 1 1-10-14Z" fill="#c79bff" opacity="0.85" transform="translate(30 -2)" />
++          <ellipse cx="60" cy="38" rx="34" ry="18" fill="none" stroke="#a855f7" strokeOpacity="0.75" strokeWidth="1" />
++        </>
++      );
++    default:
++      return null;
++  }
++}
++
++export function Table3D({ itemId = 'table_graphite', size = 56 }) {
++  const u = useUid();
++  const t = TABLES[itemId] || TABLES.table_graphite;
++  const w = size * 1.34;
++  return (
++    <span className="i3 i3--table" style={{ width: w, height: size }} data-item={itemId}>
++      <svg viewBox="0 0 120 90" width={w} height={size} aria-hidden="true">
++        <defs>
++          <linearGradient id={u('rim')} x1="0" y1="0" x2="0" y2="1">
++            <stop offset="0" stopColor={t.rim[0]} />
++            <stop offset="0.5" stopColor={t.rim[1]} />
++            <stop offset="1" stopColor={t.rim[2]} />
++          </linearGradient>
++          <radialGradient id={u('felt')} cx="0.5" cy="0.4" r="0.75">
++            <stop offset="0" stopColor={t.felt[0]} />
++            <stop offset="1" stopColor={t.felt[1]} />
++          </radialGradient>
++          <radialGradient id={u('glow')} cx="0.5" cy="0.5" r="0.5">
++            <stop offset="0.6" stopColor={t.glow} stopOpacity="0" />
++            <stop offset="1" stopColor={t.glow} stopOpacity="0.55" />
++          </radialGradient>
++          <clipPath id={u('cl')}>
++            <ellipse cx="60" cy="38" rx="46" ry="26" />
++          </clipPath>
++        </defs>
++        <ellipse cx="60" cy="52" rx="58" ry="30" fill={t.glow} opacity="0.16" />
++        <ellipse cx="60" cy="78" rx="46" ry="7" fill="#000" opacity="0.5" />
++        {/* толщина столешницы */}
++        <path d="M4 40v9c0 15 26 26 56 26s56-11 56-26v-9Z" fill={t.rim[2]} />
++        <path d="M4 40v9c0 15 26 26 56 26s56-11 56-26v-9Z" fill="#000" opacity="0.25" />
++        <ellipse cx="60" cy="40" rx="56" ry="31" fill={`url(#${u('rim')})`} />
++        <ellipse cx="60" cy="40" rx="56" ry="31" fill="none" stroke="#fff" strokeOpacity="0.35" strokeWidth="1" />
++        <ellipse cx="60" cy="38" rx="48" ry="27.500" fill="#000" opacity="0.5" />
++        <ellipse cx="60" cy="38" rx="46" ry="26" fill={`url(#${u('felt')})`} />
++        <g clipPath={`url(#${u('cl')})`}>
++          <TableSurface id={itemId} u={u} />
++          <ellipse cx="60" cy="38" rx="46" ry="26" fill={`url(#${u('glow')})`} />
++          <path d="M14 30C34 10 86 6 106 28 86 18 34 20 14 30Z" fill="#fff" opacity="0.1" />
++        </g>
++        {/* карты и фишки для масштаба */}
++        <g className="i3__props">
++          <rect x="50" y="30" width="11" height="15" rx="2" fill="#fff" transform="rotate(-14 55 37)" opacity="0.96" />
++          <rect x="58" y="31" width="11" height="15" rx="2" fill="#eef" transform="rotate(10 63 38)" />
++          <ellipse cx="82" cy="46" rx="5" ry="2.600" fill={t.glow} />
++          <ellipse cx="82" cy="44.500" rx="5" ry="2.600" fill="#fff" opacity="0.85" />
++        </g>
++      </svg>
++    </span>
++  );
++}
++
++/* ───────────────────────────── ЭМОЦИИ ───────────────────────────── */
++
++function EmojiBody({ id, u }) {
++  const grad = (name, stops, vertical = true) => (
++    <linearGradient id={u(name)} x1="0" y1="0" x2={vertical ? 0 : 1} y2={vertical ? 1 : 1}>
++      {stops.map(([o, c], i) => (
++        <stop key={i} offset={o} stopColor={c} />
++      ))}
++    </linearGradient>
++  );
++  switch (id) {
++    case 'emoji_fire':
++      return (
++        <>
++          <defs>
++            {grad('o', [[0, '#ff3d2e'], [0.55, '#ff8a1f'], [1, '#ffcf3a']])}
++            {grad('m', [[0, '#ff9a1f'], [1, '#ffe27a']])}
++            {grad('i', [[0, '#ffe27a'], [1, '#ffffff']])}
++          </defs>
++          <g className="i3__flame">
++            <path d="M32 3c2 10 11 14 14 24 3 10-2 22-14 27C20 49 15 38 18 28c1.500 5 4.500 6 6 5-2-9 2-14 5-20 1-3 2-6 3-10Z" fill={`url(#${u('o')})`} />
++            <path d="M32 20c1 7 8 10 10 18 1.800 7-2 14-10 16-8-2-12-9-10-16 1 3 3 4 4 3-1-6 2-9 4-13 1.500-3 2-5 2-8Z" fill={`url(#${u('m')})`} />
++            <path d="M32 36c1 4 5 6 5 11 0 4-2.500 6.500-5 7-2.500-.5-5-3-5-7 0-3 2-4 3-6 1 1.500 1.500 1 2-5Z" fill={`url(#${u('i')})`} />
++          </g>
++          <path d="M23 24c-1 4 0 7 2 9" stroke="#fff" strokeOpacity="0.5" strokeWidth="1.600" fill="none" strokeLinecap="round" />
++          <circle className="i3__spark i3__spark--a" cx="14" cy="22" r="1.800" fill="#ffd36a" />
++          <circle className="i3__spark i3__spark--b" cx="50" cy="16" r="1.500" fill="#ff9a3a" />
++          <circle className="i3__spark i3__spark--c" cx="52" cy="38" r="1.200" fill="#ffd36a" />
++        </>
++      );
++    case 'emoji_ice':
++      return (
++        <>
++          <defs>
++            {grad('a', [[0, '#f4fdff'], [0.5, '#7fdcff'], [1, '#2a7ad0']])}
++            {grad('b', [[0, '#c9f1ff'], [1, '#1d5fc0']])}
++          </defs>
++          {[0, 60, 120, 180, 240, 300].map((r) => (
++            <path key={r} d="M32 32 29.500 8 32 3 34.500 8Z" fill={`url(#${u('a')})`} stroke="#eaffff" strokeOpacity="0.8" strokeWidth="0.8" transform={`rotate(${r} 32 32)`} />
++          ))}
++          {[30, 90, 150, 210, 270, 330].map((r) => (
++            <path key={r} d="M32 32 30 17 32 14 34 17Z" fill="#aee8ff" opacity="0.85" transform={`rotate(${r} 32 32)`} />
++          ))}
++          <path d="M32 20 43 26v12L32 44 21 38V26Z" fill={`url(#${u('b')})`} stroke="#fff" strokeOpacity="0.85" strokeWidth="1" />
++          <path d="M32 20 43 26 32 32 21 26Z" fill="#fff" opacity="0.65" />
++          <path d="M32 32v12L21 38V26Z" fill="#fff" opacity="0.18" />
++          <circle className="i3__spark i3__spark--a" cx="50" cy="12" r="1.500" fill="#fff" />
++          <circle className="i3__spark i3__spark--b" cx="12" cy="48" r="1.300" fill="#cfeeff" />
++        </>
++      );
++    case 'emoji_skull':
++      return (
++        <>
++          <defs>
++            <radialGradient id={u('a')} cx="0.4" cy="0.3" r="0.9">
++              <stop offset="0" stopColor="#ffffff" />
++              <stop offset="0.6" stopColor="#d9dcf0" />
++              <stop offset="1" stopColor="#8a8fb4" />
++            </radialGradient>
++          </defs>
++          <path d="M32 5C17 5 9 15 9 27c0 8 4 13 9 16v8c0 2.500 2 4.500 4.500 4.500h19c2.500 0 4.500-2 4.500-4.500v-8c5-3 9-8 9-16C55 15 47 5 32 5Z" fill={`url(#${u('a')})`} stroke="#5a5f86" strokeWidth="1.400" />
++          <path d="M18 24c0-4 3.500-7 7.500-7s7.500 3 7.500 8-3.500 8-7.500 8-7.500-4-7.500-9ZM46 24c0-4-3.500-7-7.500-7S31 20 31 25s3.500 8 7.500 8 7.500-4 7.500-9Z" fill="#1a1530" />
++          <path d="M32 33 28 42h8Z" fill="#1a1530" />
++          <path d="M22 47v8M27 48v9M32 48v9M37 48v9M42 47v8" stroke="#5a5f86" strokeWidth="1.600" strokeLinecap="round" />
++          <circle className="i3__eye" cx="26" cy="25" r="2" fill="#a855f7" />
++          <circle className="i3__eye" cx="38" cy="25" r="2" fill="#a855f7" />
++          <path d="M14 14c4-5 9-7 14-7" stroke="#fff" strokeOpacity="0.8" strokeWidth="2" fill="none" strokeLinecap="round" />
++        </>
++      );
++    case 'emoji_snake':
++      return (
++        <>
++          <defs>
++            {grad('a', [[0, '#9bf5c6'], [0.5, '#22b573'], [1, '#07603e']], false)}
++          </defs>
++          <path className="i3__coil" d="M46 50C34 56 16 52 17 42c1-9 24-5 30-14 4-6-2-14-12-14-9 0-14 6-12 12" fill="none" stroke="#04301f" strokeWidth="11" strokeLinecap="round" />
++          <path className="i3__coil" d="M46 50C34 56 16 52 17 42c1-9 24-5 30-14 4-6-2-14-12-14-9 0-14 6-12 12" fill="none" stroke={`url(#${u('a')})`} strokeWidth="8.500" strokeLinecap="round" />
++          <path d="M46 50C34 56 16 52 17 42c1-9 24-5 30-14 4-6-2-14-12-14-9 0-14 6-12 12" fill="none" stroke="#d7ffe9" strokeOpacity="0.5" strokeWidth="2.600" strokeDasharray="1 5" strokeLinecap="round" />
++          <ellipse cx="22" cy="23" rx="8.500" ry="7" fill={`url(#${u('a')})`} stroke="#04301f" strokeWidth="1.200" transform="rotate(-18 22 23)" />
++          <circle cx="19" cy="21" r="2.200" fill="#fff7a8" />
++          <circle cx="19.500" cy="21" r="1" fill="#10121c" />
++          <path className="i3__tongue" d="M14 28l-6 3m6-3-5-5m5 5-7 0" stroke="#ff3b5c" strokeWidth="1.600" strokeLinecap="round" fill="none" />
++        </>
++      );
++    case 'emoji_bolt':
++      return (
++        <>
++          <defs>
++            {grad('a', [[0, '#ffffff'], [0.4, '#8fe8ff'], [1, '#2a6bff']])}
++            {grad('b', [[0, '#e8fbff'], [1, '#52b6ff']])}
++            <radialGradient id={u('hb')}><stop offset="0.3" stopColor="#4fc3ff" stopOpacity="0.9" /><stop offset="1" stopColor="#4fc3ff" stopOpacity="0" /></radialGradient>
++          </defs>
++          <circle className="i3__halo" cx="32" cy="32" r="30" fill={`url(#${u("hb")})`} />
++          <path d="M39 2 14 36h14l-5 26 28-38H35Z" fill="#0d2a7a" transform="translate(1.500 2)" opacity="0.6" />
++          <path d="M39 2 14 36h14l-5 26 28-38H35Z" fill={`url(#${u('a')})`} stroke="#eaffff" strokeWidth="1.200" strokeLinejoin="round" />
++          <path d="M37 9 22 33h12l-3 15" fill="none" stroke="#fff" strokeOpacity="0.85" strokeWidth="2.200" strokeLinecap="round" strokeLinejoin="round" />
++          <path d="M44 24 31 40" stroke="#1d5fff" strokeOpacity="0.4" strokeWidth="2" strokeLinecap="round" />
++          <circle className="i3__spark i3__spark--a" cx="12" cy="18" r="1.600" fill="#bfefff" />
++          <circle className="i3__spark i3__spark--b" cx="52" cy="46" r="1.600" fill="#bfefff" />
++        </>
++      );
++    case 'emoji_rocket':
++      return (
++        <>
++          <defs>
++            {grad('a', [[0, '#ffffff'], [0.5, '#dfe3f6'], [1, '#8a93c4']], false)}
++            {grad('f', [[0, '#ffe27a'], [0.5, '#ff8a1f'], [1, '#ff3d2e']])}
++            {grad('r', [[0, '#ff7aa8'], [1, '#c01a5a']])}
++          </defs>
++          <g className="i3__fly">
++            <path className="i3__plume" d="M32 50c-6 4-7 9-5 12 2-1 3-1 5-4 2 3 3 3 5 4 2-3 1-8-5-12Z" fill={`url(#${u('f')})`} />
++            <path d="M32 50c-3 2-3.500 5-2.500 7 1-1 1.500-1.500 2.500-3 1 1.500 1.500 2 2.500 3 1-2 .5-5-2.500-7Z" fill="#fff6c8" />
++            <path d="M20 38 10 48l1 6 10-4ZM44 38l10 10-1 6-10-4Z" fill={`url(#${u('r')})`} stroke="#6a0f36" strokeWidth="0.9" />
++            <path d="M32 3C42 11 46 22 45 36l-4 12H23l-4-12C18 22 22 11 32 3Z" fill={`url(#${u('a')})`} stroke="#5b628f" strokeWidth="1.200" />
++            <path d="M32 3C37 7 41 12 43 18H21c2-6 6-11 11-15Z" fill={`url(#${u('r')})`} />
++            <circle cx="32" cy="28" r="6.500" fill="#1a1f4a" stroke="#c9d0f5" strokeWidth="2" />
++            <circle cx="32" cy="28" r="4.200" fill="#4fc3ff" />
++            <circle cx="30" cy="26" r="1.500" fill="#fff" />
++            <path d="M24 41h16" stroke="#5b628f" strokeOpacity="0.6" strokeWidth="1.200" />
++          </g>
++          <circle className="i3__spark i3__spark--a" cx="12" cy="30" r="1.400" fill="#fff" />
++          <circle className="i3__spark i3__spark--b" cx="54" cy="24" r="1.600" fill="#ffd36a" />
++        </>
++      );
++    case 'emoji_diamond':
++      return (
++        <>
++          <defs>
++            {grad('a', [[0, '#f0e8ff'], [0.5, '#b08cff'], [1, '#5b2bd6']])}
++            {grad('b', [[0, '#ffffff'], [1, '#c4a8ff']])}
++          </defs>
++          <path d="M14 22 22 8h20l8 14-18 38Z" fill={`url(#${u('a')})`} stroke="#f4eeff" strokeWidth="1.200" strokeLinejoin="round" />
++          <path d="M14 22h36L32 60Z" fill="#5b2bd6" opacity="0.28" />
++          <path d="M14 22 22 8l10 14ZM50 22 42 8 32 22Z" fill={`url(#${u('b')})`} opacity="0.95" />
++          <path d="M22 8h20l-10 14Z" fill="#fff" opacity="0.8" />
++          <path d="M14 22h18L32 60ZM50 22H32l0 38Z" fill="#7a4cf0" opacity="0.35" />
++          <path d="M14 22 32 60M50 22 32 60M22 8 32 22 42 8" fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="0.9" />
++          <path className="i3__glint" d="M44 5v10M39 10h10" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
++          <circle className="i3__spark i3__spark--b" cx="10" cy="48" r="1.500" fill="#e4d6ff" />
++        </>
++      );
++    default:
++      return null;
++  }
++}
++
++export function Emoji3D({ id, size = 34 }) {
++  const u = useUid();
++  if (!id) return null;
++  return (
++    <span className="i3 i3--emoji" style={{ width: size, height: size }} data-item={id}>
++      <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
++        <ellipse cx="32" cy="60" rx="15" ry="2.800" fill="#000" opacity="0.4" />
++        <EmojiBody id={id} u={u} />
++      </svg>
++    </span>
++  );
++}
++
++/* ───────────────────────────── ЭФФЕКТЫ ───────────────────────────── */
++
++export function Effect3D({ id = 'effect_none', size = 56 }) {
++  const u = useUid();
++  return (
++    <span className="i3 i3--effect" style={{ width: size, height: size }} data-item={id}>
++      <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
++        <defs>
++          <radialGradient id={u('orb')} cx="0.35" cy="0.3" r="0.8">
++            <stop offset="0" stopColor="#ffffff" />
++            <stop offset="0.45" stopColor="#7fd6ff" />
++            <stop offset="1" stopColor="#1d5fc0" />
++          </radialGradient>
++          <radialGradient id={u('hl')}><stop offset="0.3" stopColor="#4f8cff" stopOpacity="0.9" /><stop offset="1" stopColor="#4f8cff" stopOpacity="0" /></radialGradient>
++          <radialGradient id={u('hp')}><stop offset="0.3" stopColor="#ff7a2e" stopOpacity="0.9" /><stop offset="1" stopColor="#ff7a2e" stopOpacity="0" /></radialGradient>
++          <radialGradient id={u('pn')} cx="0.5" cy="0.4" r="0.7">
++            <stop offset="0" stopColor="#fff3b0" />
++            <stop offset="0.5" stopColor="#ff9a2e" />
++            <stop offset="1" stopColor="#d6361f" />
++          </radialGradient>
++        </defs>
++        <ellipse cx="32" cy="58" rx="14" ry="2.600" fill="#000" opacity="0.4" />
++        {id === 'effect_ripple' ? (
++          <>
++            {[0, 1, 2].map((i) => (
++              <ellipse key={i} className={`i3__ring i3__ring--${i}`} cx="32" cy="34" rx="12" ry="6.500" fill="none" stroke="#7fd6ff" strokeWidth="2.200" />
++            ))}
++            <ellipse cx="32" cy="34" rx="13" ry="7" fill="#1d5fc0" opacity="0.35" />
++            <circle cx="32" cy="27" r="8.500" fill={`url(#${u('orb')})`} stroke="#eaffff" strokeOpacity="0.7" strokeWidth="1" />
++            <ellipse cx="29" cy="24" rx="3" ry="2" fill="#fff" opacity="0.85" />
++          </>
++        ) : null}
++        {id === 'effect_glitch' ? (
++          <>
++            <rect className="i3__slice i3__slice--c" x="14" y="14" width="36" height="36" rx="6" fill="#22d3ee" opacity="0.55" />
++            <rect className="i3__slice i3__slice--m" x="14" y="14" width="36" height="36" rx="6" fill="#f472b6" opacity="0.55" />
++            <rect x="14" y="14" width="36" height="36" rx="6" fill="#1a1740" stroke="#c4b5fd" strokeWidth="1.400" />
++            <circle cx="32" cy="26" r="6" fill="#c4b5fd" />
++            <path d="M20 46c2-8 8-10 12-10s10 2 12 10Z" fill="#c4b5fd" />
++            <rect className="i3__bar i3__bar--a" x="12" y="22" width="40" height="3.500" fill="#22d3ee" />
++            <rect className="i3__bar i3__bar--b" x="12" y="36" width="40" height="3" fill="#f472b6" />
++            {[[8, 12], [54, 18], [52, 50], [10, 46]].map(([x, y], i) => (
++              <rect key={i} className={`i3__px i3__px--${i}`} x={x} y={y} width="4" height="4" fill={i % 2 ? '#f472b6' : '#22d3ee'} />
++            ))}
++          </>
++        ) : null}
++        {id === 'effect_lightning' ? (
++          <>
++            <circle cx="32" cy="32" r="30" fill={`url(#${u("hl")})`} className="i3__halo" />
++            <circle cx="32" cy="32" r="9" fill={`url(#${u('orb')})`} stroke="#eaffff" strokeWidth="1" />
++            {[
++              'M32 23 28 14 33 10 27 2',
++              'M40 28 50 24 47 18 58 14',
++              'M24 38 14 42 18 48 8 54',
++              'M38 40 42 50 37 54 41 62',
++            ].map((d, i) => (
++              <g key={i} className={`i3__bolt i3__bolt--${i}`}>
++                <path d={d} fill="none" stroke="#2a6bff" strokeWidth="3.600" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
++                <path d={d} fill="none" stroke="#f4ffff" strokeWidth="1.600" strokeLinecap="round" strokeLinejoin="round" />
++              </g>
++            ))}
++          </>
++        ) : null}
++        {id === 'effect_phoenix' ? (
++          <>
++            <circle cx="32" cy="34" r="30" fill={`url(#${u("hp")})`} className="i3__halo" />
++            <path className="i3__wing i3__wing--l" d="M30 30C20 22 10 22 4 28c6 0 9 3 11 6-4 0-7 2-8 5 6-2 12-1 18 1Z" fill={`url(#${u('pn')})`} stroke="#ffe27a" strokeWidth="0.8" />
++            <path className="i3__wing i3__wing--r" d="M34 30c10-8 20-8 26-2-6 0-9 3-11 6 4 0 7 2 8 5-6-2-12-1-18 1Z" fill={`url(#${u('pn')})`} stroke="#ffe27a" strokeWidth="0.8" />
++            <path d="M32 18c3 3 4 6 4 9 0 5-2 9-4 11-2-2-4-6-4-11 0-3 1-6 4-9Z" fill={`url(#${u('pn')})`} />
++            <path d="M32 36c5 5 6 11 3 18-1-3-2-4-3-4s-2 1-3 4c-3-7-2-13 3-18Z" fill="#ffcf3a" opacity="0.95" />
++            <circle cx="32" cy="22" r="1.200" fill="#2a0a05" />
++            <path d="M32 16 36 12" stroke="#ffe27a" strokeWidth="1.600" strokeLinecap="round" />
++            {[[16, 46], [48, 44], [24, 54], [40, 56], [32, 8]].map(([x, y], i) => (
++              <circle key={i} className={`i3__ember i3__ember--${i}`} cx={x} cy={y} r="1.500" fill="#ffd36a" />
++            ))}
++          </>
++        ) : null}
++        {id === 'effect_none' || !id ? (
++          <>
++            <circle cx="32" cy="32" r="16" fill="none" stroke="#6b5ba8" strokeWidth="2" strokeDasharray="4 5" />
++            <circle cx="32" cy="27" r="5" fill="#6b5ba8" opacity="0.7" />
++            <path d="M22 42c2-6 6-8 10-8s8 2 10 8Z" fill="#6b5ba8" opacity="0.7" />
++          </>
++        ) : null}
++      </svg>
++    </span>
++  );
++}
++
++/* ───────────────────────────── 3D-ПОДАЧА НАГРАДЫ ───────────────────────────── */
++
++const RARITY_FX = {
++  common: { n: 6, hue: '#9aa4c4' },
++  rare: { n: 14, hue: '#66b0ff' },
++  epic: { n: 22, hue: '#c27bff' },
++  legendary: { n: 34, hue: '#ffb52a' },
++  mythic: { n: 40, hue: '#ff5a5a' },
++};
++
++const PARTICLES = Array.from({ length: 40 }, (_, i) => {
++  const a = (i / 40) * Math.PI * 2 + (i % 3) * 0.37;
++  const d = 90 + ((i * 37) % 90);
++  return { id: i, x: Math.cos(a) * d, y: Math.sin(a) * d * 0.8 - 20, s: 0.6 + ((i * 13) % 10) / 10, delay: (i * 53) % 700 };
++});
++
++/**
++ * Объёмная презентация награды: камера «наезжает», предмет вращается на подставке,
++ * сверху свет, снизу отражение. Тип (колода/стол/эмоция/эффект) и редкость
++ * задают разный сценарий — см. data-атрибуты и items3d.css.
++ */
++export function Reward3D({ type = 'deck', rarity = 'common', name = '', children }) {
++  const fx = RARITY_FX[rarity] || RARITY_FX.common;
++  return (
++    <div className={`rd3 rd3--${type}`} data-rarity={rarity} style={{ '--rd3-hue': fx.hue }}>
++      <span className="rd3__beam" aria-hidden="true" />
++      <span className="rd3__rays" aria-hidden="true" />
++      <span className="rd3__spot" aria-hidden="true" />
++      <div className="rd3__cam">
++        <div className="rd3__turn">
++          <div className="rd3__item">{children}</div>
++          <span className="rd3__sweep" aria-hidden="true" />
++        </div>
++      </div>
++      <span className="rd3__floor" aria-hidden="true" />
++      <span className="rd3__mirror" aria-hidden="true" />
++      <span className="rd3__ring rd3__ring--a" aria-hidden="true" />
++      <span className="rd3__ring rd3__ring--b" aria-hidden="true" />
++      <span className="rd3__dust" aria-hidden="true">
++        {PARTICLES.slice(0, fx.n).map((p) => (
++          <i key={p.id} style={{ '--x': `${p.x}px`, '--y': `${p.y}px`, '--s': p.s, '--d': `${p.delay}ms` }} />
++        ))}
++      </span>
++      <div className="rd3__name" aria-label={name}>
++        {Array.from(name).map((ch, i) => (
++          <span key={i} style={{ '--i': i }} aria-hidden="true">
++            {ch === ' ' ? ' ' : ch}
++          </span>
++        ))}
++      </div>
++    </div>
++  );
++}
+diff --git a/client/src/components/PlayerTag.jsx b/client/src/components/PlayerTag.jsx
+index 3e6aec3..fdbbc3c 100644
+--- a/client/src/components/PlayerTag.jsx
++++ b/client/src/components/PlayerTag.jsx
+@@ -1,16 +1,16 @@
+-import { emojiOf } from '../catalog.js';
++import { Emoji3D } from './Items3D.jsx';
+ 
+ /**
+  * Имя игрока с выбранным эмодзи.
+  * Используется везде, где показывается ник: профиль, стол, рейтинг, списки.
+  */
+ export function PlayerTag({ name, emoji, size = 15, className = '', badge = null }) {
+-  const symbol = emojiOf(emoji);
++  const symbol = emoji && emoji !== 'emoji_none' ? emoji : '';
+   return (
+     <span className={`ptag ${className}`.trim()}>
+       {symbol ? (
+-        <span className="ptag__emoji" style={{ fontSize: `${size}px` }} aria-hidden="true">
+-          {symbol}
++        <span className="ptag__emoji" aria-hidden="true">
++          <Emoji3D id={symbol} size={Math.round(size * 1.5)} />
+         </span>
+       ) : null}
+       <span className="ptag__name">{name || 'Игрок'}</span>
+diff --git a/client/src/components/Seat.jsx b/client/src/components/Seat.jsx
+index 3fcb46a..83c6d32 100644
+--- a/client/src/components/Seat.jsx
++++ b/client/src/components/Seat.jsx
+@@ -1,4 +1,4 @@
+-import { emojiOf } from '../catalog.js';
++import { Emoji3D } from './Items3D.jsx';
+ import { Avatar } from './Avatar.jsx';
+ 
+ // Место игрока за овальным столом: аватар, имя, число карт и статус хода.
+@@ -10,7 +10,7 @@ export function Seat({ player, slot = 'top', isMe, isTurn, deckClass, waiting =
+   if (player.connected === false) classes.push('seat--offline');
+ 
+   const cards = Math.max(0, Number(player.cards) || 0);
+-  const emoji = emojiOf(player.equipped?.emoji);
++  const emoji = player.equipped?.emoji && player.equipped.emoji !== 'emoji_none' ? player.equipped.emoji : '';
+   const name = player.name || player.username || 'Игрок';
+   const fan = Math.min(cards, 4);
+ 
+@@ -30,7 +30,7 @@ export function Seat({ player, slot = 'top', isMe, isTurn, deckClass, waiting =
+       </span>
+       <span className="seat__plate">
+         <span className="seat__name">
+-          {emoji ? <span className="seat__emoji" aria-hidden="true">{emoji}</span> : null}
++          {emoji ? <span className="seat__emoji" aria-hidden="true"><Emoji3D id={emoji} size={22} /></span> : null}
+           {name}
+         </span>
+         <span className="seat__meta">
+diff --git a/client/src/items3d.css b/client/src/items3d.css
+new file mode 100644
+index 0000000..5a1f37a
+--- /dev/null
++++ b/client/src/items3d.css
+@@ -0,0 +1,216 @@
++/* ═══ Объёмные предметы магазина и 3D-подача награды ═══
++   Анимируются только transform и opacity. */
++
++.i3 { display: inline-flex; position: relative; flex: 0 0 auto; line-height: 0; perspective: 600px; }
++.i3 svg { display: block; overflow: visible; transform-style: preserve-3d; }
++.i3 [class*='i3__'] { transform-box: fill-box; transform-origin: center; }
++
++/* ---------- колоды ---------- */
++.i3--deck svg { animation: i3-bob 4.6s ease-in-out infinite; }
++.i3--deck .i3__card--front { transform-origin: 50% 50%; }
++.i3--deck:hover svg, .v3-roulette__cell .i3--deck svg { animation-duration: 2.6s; }
++@keyframes i3-bob { 0%,100% { transform: translateY(0) rotateY(-8deg); } 50% { transform: translateY(-2px) rotateY(8deg); } }
++
++/* ---------- столы ---------- */
++.i3--table svg { animation: i3-tilt 6s ease-in-out infinite; }
++@keyframes i3-tilt { 0%,100% { transform: rotateX(8deg) rotateZ(-2deg); } 50% { transform: rotateX(0deg) rotateZ(2deg) translateY(-1px); } }
++.i3--table .i3__props { transform-origin: center; }
++
++/* ---------- эмоции ---------- */
++.i3--emoji svg { animation: i3-pop 3.2s ease-in-out infinite; }
++@keyframes i3-pop { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.5px) scale(1.05); } }
++.i3__flame { animation: i3-flick 1.1s ease-in-out infinite alternate; transform-origin: 50% 90%; }
++@keyframes i3-flick { from { transform: scale(1, 1) skewX(-2deg); } to { transform: scale(0.96, 1.06) skewX(2deg); } }
++.i3__spark { animation: i3-spark 2.2s ease-in-out infinite; }
++.i3__spark--b { animation-delay: .7s; } .i3__spark--c { animation-delay: 1.3s; }
++@keyframes i3-spark { 0%,100% { opacity: 0; transform: translateY(2px) scale(.5); } 50% { opacity: 1; transform: translateY(-3px) scale(1.2); } }
++.i3__eye { animation: i3-eye 2.4s ease-in-out infinite; }
++@keyframes i3-eye { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
++.i3__tongue { animation: i3-tongue 1.8s ease-in-out infinite; transform-origin: 100% 50%; }
++@keyframes i3-tongue { 0%,70%,100% { transform: scaleX(1); } 80% { transform: scaleX(1.35); } }
++.i3__halo { animation: i3-halo 1.6s ease-in-out infinite; }
++@keyframes i3-halo { 0%,100% { opacity: .12; transform: scale(.95); } 50% { opacity: .34; transform: scale(1.06); } }
++.i3__fly { animation: i3-fly 1.4s ease-in-out infinite; }
++@keyframes i3-fly { 0%,100% { transform: translate(0, 1px) rotate(-3deg); } 50% { transform: translate(1px, -2px) rotate(3deg); } }
++.i3__plume { animation: i3-plume .35s ease-in-out infinite alternate; transform-origin: 50% 0; }
++@keyframes i3-plume { from { transform: scaleY(.85); } to { transform: scaleY(1.2); } }
++.i3__glint { animation: i3-glint 2.6s ease-in-out infinite; }
++@keyframes i3-glint { 0%,60%,100% { opacity: 0; transform: scale(.4) rotate(0); } 75% { opacity: 1; transform: scale(1.1) rotate(45deg); } }
++.i3__coil { animation: i3-coil 3.2s ease-in-out infinite; }
++@keyframes i3-coil { 0%,100% { transform: translateX(0); } 50% { transform: translateX(1px); } }
++
++/* ---------- эффекты ---------- */
++.i3__ring { animation: i3-ring 2.4s ease-out infinite; opacity: 0; }
++.i3__ring--1 { animation-delay: .8s; } .i3__ring--2 { animation-delay: 1.6s; }
++@keyframes i3-ring { 0% { transform: scale(.5); opacity: .95; } 100% { transform: scale(2.1); opacity: 0; } }
++.i3__slice--c { animation: i3-gl-c 1.4s steps(1) infinite; }
++.i3__slice--m { animation: i3-gl-m 1.4s steps(1) infinite; }
++@keyframes i3-gl-c { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-3px, 1px); } 40% { transform: translate(2px, -1px); } 60% { transform: translate(-1px, 0); } }
++@keyframes i3-gl-m { 0%,100% { transform: translate(0,0); } 25% { transform: translate(3px, -1px); } 50% { transform: translate(-2px, 1px); } 75% { transform: translate(1px, 0); } }
++.i3__bar--a { animation: i3-bar 1.4s steps(1) infinite; }
++.i3__bar--b { animation: i3-bar 1.4s steps(1) .5s infinite; }
++@keyframes i3-bar { 0%,100% { opacity: 0; transform: translateX(0); } 20% { opacity: .9; transform: translateX(-5px); } 45% { opacity: 0; } 70% { opacity: .8; transform: translateX(6px); } }
++.i3__px { animation: i3-px 1.6s steps(2) infinite; }
++.i3__px--1 { animation-delay: .3s; } .i3__px--2 { animation-delay: .7s; } .i3__px--3 { animation-delay: 1.1s; }
++@keyframes i3-px { 0%,100% { opacity: 0; } 50% { opacity: 1; transform: translateY(-3px); } }
++.i3__bolt { animation: i3-bolt 1.3s steps(1) infinite; }
++.i3__bolt--1 { animation-delay: .3s; } .i3__bolt--2 { animation-delay: .7s; } .i3__bolt--3 { animation-delay: 1s; }
++@keyframes i3-bolt { 0%,100% { opacity: .1; } 10% { opacity: 1; } 22% { opacity: .2; } 34% { opacity: 1; } 55% { opacity: .15; } }
++.i3__wing--l { animation: i3-wing-l 1.2s ease-in-out infinite; transform-origin: 100% 50%; }
++.i3__wing--r { animation: i3-wing-r 1.2s ease-in-out infinite; transform-origin: 0% 50%; }
++@keyframes i3-wing-l { 0%,100% { transform: rotate(8deg) scaleY(1); } 50% { transform: rotate(-12deg) scaleY(.8); } }
++@keyframes i3-wing-r { 0%,100% { transform: rotate(-8deg) scaleY(1); } 50% { transform: rotate(12deg) scaleY(.8); } }
++.i3__ember { animation: i3-ember 2s ease-in infinite; }
++.i3__ember--1 { animation-delay: .4s; } .i3__ember--2 { animation-delay: .9s; } .i3__ember--3 { animation-delay: 1.3s; } .i3__ember--4 { animation-delay: 1.7s; }
++@keyframes i3-ember { 0% { opacity: 0; transform: translateY(6px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px) scale(.3); } }
++
++/* ═══ 3D-подача награды ═══ */
++.rd3 {
++  --rd3-hue: #9aa4c4;
++  position: relative; width: min(100%, 340px); height: 250px; margin: 0 auto;
++  perspective: 900px; perspective-origin: 50% 42%; overflow: visible; isolation: isolate;
++}
++.rd3__beam {
++  position: absolute; left: 50%; top: -30px; width: 190px; height: 230px; margin-left: -95px; z-index: 0;
++  background: linear-gradient(180deg, color-mix(in srgb, var(--rd3-hue) 70%, #fff) 0%, transparent 100%);
++  clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); opacity: 0; transform-origin: 50% 0;
++  animation: rd3-beam 1.1s .2s ease-out forwards;
++}
++@keyframes rd3-beam { 0% { opacity: 0; transform: scaleY(.2); } 40% { opacity: .55; } 100% { opacity: .22; transform: scaleY(1); } }
++.rd3__rays {
++  position: absolute; left: 50%; top: 42%; width: 360px; height: 360px; margin: -180px 0 0 -180px; z-index: 0; opacity: 0;
++  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rd3-hue) 55%, transparent) 0 6deg, transparent 6deg 18deg);
++  -webkit-mask-image: radial-gradient(circle, #000 5%, transparent 62%); mask-image: radial-gradient(circle, #000 5%, transparent 62%);
++  animation: rd3-rays 14s linear infinite, rd3-fade .9s .3s ease-out forwards;
++}
++.rd3[data-rarity='common'] .rd3__rays, .rd3[data-rarity='common'] .rd3__beam { display: none; }
++@keyframes rd3-rays { to { transform: rotate(360deg); } }
++@keyframes rd3-fade { to { opacity: .5; } }
++.rd3__spot {
++  position: absolute; left: 50%; top: 42%; width: 260px; height: 260px; margin: -130px 0 0 -130px; z-index: 0; border-radius: 50%;
++  background: radial-gradient(circle, color-mix(in srgb, var(--rd3-hue) 55%, transparent) 0%, transparent 68%);
++  opacity: 0; animation: rd3-spot 1s .15s ease-out forwards;
++}
++@keyframes rd3-spot { from { opacity: 0; transform: scale(.4); } to { opacity: .85; transform: scale(1); } }
++
++/* камера: плавный наезд */
++.rd3__cam { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; transform-style: preserve-3d; animation: rd3-cam 1.5s cubic-bezier(.2,.8,.2,1) both; }
++@keyframes rd3-cam { 0% { transform: translateZ(-420px) scale(.5); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateZ(0) scale(1); opacity: 1; } }
++.rd3__turn { position: relative; transform-style: preserve-3d; will-change: transform; animation: rd3-sway 6s ease-in-out 1.2s infinite; }
++.rd3__item { position: relative; display: grid; place-items: center; filter: drop-shadow(0 14px 12px rgba(0,0,0,.5)); }
++.rd3__item .i3 svg { animation: none; }
++.rd3__item .i3 { perspective: none; }
++@keyframes rd3-sway { 0%,100% { transform: rotateY(-26deg) rotateX(4deg); } 50% { transform: rotateY(26deg) rotateX(-2deg); } }
++
++/* блик света, пробегающий по предмету */
++.rd3__sweep {
++  position: absolute; inset: 8% 14%; pointer-events: none; mix-blend-mode: screen; opacity: 0; overflow: hidden;
++  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.85) 50%, transparent 62%);
++  transform: translateX(-100%); animation: rd3-sweep 3.4s 1.4s ease-in-out infinite;
++  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 62%); mask-image: radial-gradient(ellipse at center, #000 30%, transparent 62%);
++}
++@keyframes rd3-sweep { 0% { transform: translateX(-120%); opacity: 0; } 20% { opacity: .8; } 55%,100% { transform: translateX(100%); opacity: 0; } }
++
++/* пол и отражение */
++.rd3__floor {
++  position: absolute; left: 50%; bottom: 52px; width: 190px; height: 34px; margin-left: -95px; z-index: 1; border-radius: 50%;
++  background: radial-gradient(ellipse, color-mix(in srgb, var(--rd3-hue) 60%, transparent) 0%, rgba(0,0,0,.5) 55%, transparent 72%);
++  opacity: 0; animation: rd3-fadein .8s .5s ease-out forwards;
++}
++.rd3__mirror {
++  position: absolute; left: 50%; bottom: 46px; width: 150px; height: 26px; margin-left: -75px; z-index: 1; border-radius: 50%;
++  border: 1px solid color-mix(in srgb, var(--rd3-hue) 80%, #fff); opacity: 0; animation: rd3-ring 2.6s 1s ease-out infinite;
++}
++@keyframes rd3-fadein { to { opacity: 1; } }
++.rd3__ring { position: absolute; left: 50%; top: 42%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid var(--rd3-hue); opacity: 0; z-index: 1; }
++.rd3[data-rarity='common'] .rd3__ring, .rd3[data-rarity='rare'] .rd3__ring--b { display: none; }
++.rd3__ring--a { animation: rd3-ring 2.6s .4s ease-out infinite; }
++.rd3__ring--b { animation: rd3-ring 2.6s 1.5s ease-out infinite; }
++@keyframes rd3-ring { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(2.4); opacity: 0; } }
++
++/* частицы */
++.rd3__dust { position: absolute; left: 50%; top: 42%; width: 0; height: 0; z-index: 3; pointer-events: none; }
++.rd3__dust i {
++  position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; opacity: 0;
++  background: color-mix(in srgb, var(--rd3-hue) 40%, #fff); box-shadow: 0 0 8px var(--rd3-hue);
++  animation: rd3-dust 2.8s var(--d) ease-out infinite; transform: scale(var(--s));
++}
++@keyframes rd3-dust { 0% { opacity: 0; transform: translate(0,0) scale(.2); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(var(--s)); } }
++
++/* название награды: буквы выезжают по очереди */
++.rd3__name { position: absolute; left: 0; right: 0; bottom: 2px; z-index: 4; text-align: center; font-weight: 900; font-size: 22px; letter-spacing: .02em; color: #fff; text-shadow: 0 2px 12px var(--rd3-hue), 0 2px 0 rgba(0,0,0,.5); white-space: nowrap; }
++.rd3__name span { display: inline-block; opacity: 0; transform: translateY(14px) scale(.7); animation: rd3-letter .5s calc(1.1s + var(--i) * 55ms) cubic-bezier(.2,1.4,.3,1) forwards; }
++@keyframes rd3-letter { to { opacity: 1; transform: none; } }
++.rd3[data-rarity='legendary'] .rd3__name, .rd3[data-rarity='mythic'] .rd3__name { color: #fff2c4; text-shadow: 0 0 14px var(--rd3-hue), 0 0 28px var(--rd3-hue), 0 2px 0 rgba(0,0,0,.5); }
++
++/* сценарии по типу предмета */
++.rd3--table .rd3__turn { animation: rd3-table-spin 12s linear 1.2s infinite; transform: rotateX(58deg); }
++@keyframes rd3-table-spin { from { transform: rotateX(58deg) rotateZ(0); } to { transform: rotateX(58deg) rotateZ(360deg); } }
++.rd3--table .rd3__item { filter: drop-shadow(0 18px 10px rgba(0,0,0,.55)); }
++.rd3--emoji .rd3__turn { animation: rd3-emoji 2.6s cubic-bezier(.3,1.4,.4,1) 1.2s infinite; }
++@keyframes rd3-emoji { 0%,100% { transform: translateY(0) rotateY(-30deg) scale(1); } 50% { transform: translateY(-14px) rotateY(30deg) scale(1.08); } }
++.rd3--effect .rd3__turn { animation: rd3-effect 3s ease-in-out 1.2s infinite; }
++@keyframes rd3-effect { 0%,100% { transform: scale(1) rotateY(-10deg); } 50% { transform: scale(1.08) rotateY(10deg); } }
++.rd3--deck .rd3__turn { animation: rd3-deck 5s ease-in-out 1.2s infinite; }
++@keyframes rd3-deck { 0%,100% { transform: rotateY(-34deg) rotateX(6deg); } 50% { transform: rotateY(34deg) rotateX(-3deg); } }
++
++/* вся сцена-результат: старые плоские элементы убираем, чтобы не двоились */
++.v3-scene[data-phase='result'] .v3-reward { display: grid; justify-items: center; gap: 8px; }
++.v3-scene[data-phase='result'] .v3-reward__ring { display: none; }
++
++@media (max-width: 380px) { .rd3 { height: 226px; } .rd3__name { font-size: 19px; } }
++@media (prefers-reduced-motion: reduce) {
++  .rd3 *, .i3 *, .i3 svg { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
++  .rd3__name span { opacity: 1; transform: none; }
++}
++
++/* В фазе награды сундук убираем: вся сцена отдаётся 3D-презентации предмета */
++.v3-scene[data-phase='result'] .v3-scene__chest { display: none; }
++
++/* ═══ Правки редизайна, этап 2 (из redesign.css / scene3d.css) ═══ */
++
++/* Лента рулетки анимируется через Web Animations: CSS-переход отключён, чтобы
++   повторные открытия не наследовали прошлое положение. */
++.v3-roulette__track { transition: none !important; transform: translate3d(0, 0, 0); }
++
++.v3-scene__close {
++  position: absolute; top: 10px; right: 10px; z-index: 6;
++  width: 40px; height: 40px; border-radius: 14px; border: 1px solid rgba(255,255,255,.22);
++  background: rgba(20, 12, 50, .72); color: #fff; font-size: 24px; line-height: 1; cursor: pointer;
++}
++
++/* ═══ Компактный главный экран, чистые тени ═══ */
++.rd-app .rd-trio__tile { min-height: 98px; gap: 6px; padding-top: 8px; padding-bottom: 10px; }
++.rd-app .rd-trio__art .ref-icon { height: 42px !important; width: auto !important; }
++.rd-app .rd-trio__label { font-size: 15px; }
++.rd-app .rd-play { min-height: 58px; font-size: 26px; border-radius: 20px; box-shadow: 0 5px 0 #a85d00, 0 8px 14px rgba(70, 25, 0, 0.4), inset 0 3px 0 rgba(255, 255, 255, 0.75); }
++.rd-app .rd-play:active { box-shadow: 0 2px 0 #a85d00, inset 0 3px 0 rgba(255, 255, 255, 0.75); }
++.rd-app .v2-tile { min-height: 96px !important; padding: 10px 12px !important; border-radius: 18px !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 6px 12px -8px rgba(0,0,0,.55) !important; }
++.rd-app .v2-tile .v3-icon, .rd-app .v2-tile__art { height: 40px; display: flex; align-items: center; }
++.rd-app .v2-tile .i3, .rd-app .v2-tile .art { transform: scale(.86); transform-origin: left center; }
++.rd-app .v2-tile__title { font-size: 16px; }
++.rd-app .v2-tile__sub { font-size: 12.5px; opacity: .85; }
++.rd-app .rd-actions, .rd-app .rd-quick { gap: 10px; }
++
++/* Индикатор «онлайн»: целиком внутри баннера, без выпирания */
++.rd-app .rd-hero { position: relative; overflow: hidden; border-radius: 22px; margin: 0; }
++.rd-app .rd-hero .rd-live { max-width: calc(100% - 28px); white-space: nowrap; box-shadow: none; padding: 5px 10px; }
++
++/* Кнопка настроек: ровный фон, без выступов и лишней тени */
++.rd-app .rd-gear { overflow: hidden; border-radius: 14px; box-shadow: 0 3px 0 #20104f, inset 0 1px 0 rgba(255,255,255,.25); background: linear-gradient(180deg, #5a31c4, #351a86); }
++.rd-app .rd-gear:active { box-shadow: 0 1px 0 #20104f, inset 0 1px 0 rgba(255,255,255,.2); transform: translateY(2px); }
++.rd-app .rd-gear .ref-icon { height: 26px !important; width: auto !important; filter: none; }
++.rd-app .rd-back, .rd-app .rd-round { box-shadow: 0 3px 0 #20104f, inset 0 1px 0 rgba(255,255,255,.25); overflow: hidden; }
++
++/* Нижняя навигация: фон строго по границам, без лишних теней */
++.rd-app .fm-nav { overflow: hidden; border-radius: 26px; box-shadow: 0 -2px 14px -6px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12); }
++.rd-app .fm-nav__item { border-radius: 20px; overflow: hidden; box-shadow: none; }
++.rd-app .fm-nav__item--on { box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 2px 0 rgba(168,93,0,.7); }
++.rd-app .rd-stats, .rd-app .rd-profile, .rd-app .rd-panel { overflow: hidden; }
++
++/* «Ваш счёт»: золотая монета, ровный блок баланса */
++:is(.rd-app, .cs-sheet, .fm-modal) .fm-wallet-hero { display: flex; align-items: center; gap: 14px; padding: 14px 16px; overflow: hidden; border-radius: 22px; box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
++:is(.rd-app, .cs-sheet, .fm-modal) .fm-wallet-hero__coin { display: grid; place-items: center; flex: 0 0 auto; width: 60px; height: 60px; background: none; box-shadow: none; border-radius: 0; }
++:is(.rd-app, .cs-sheet, .fm-modal) .fm-wallet-hero__coin .ref-icon { height: 56px !important; width: auto !important; filter: drop-shadow(0 4px 4px rgba(0,0,0,.45)); animation: i3-pop 3.6s ease-in-out infinite; }
++:is(.rd-app, .cs-sheet, .fm-modal) .fm-wallet-hero__body { flex: 1 1 auto; min-width: 0; background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
++:is(.rd-app, .cs-sheet, .fm-modal) .fm-wallet-hero__amount { display: block; font-size: 34px; line-height: 1.1; white-space: nowrap; }
+diff --git a/client/src/main.jsx b/client/src/main.jsx
+index ef9ca1a..9d0d87e 100644
+--- a/client/src/main.jsx
++++ b/client/src/main.jsx
+@@ -11,6 +11,7 @@ import './casino.css';
+ import './layout.css';
+ import './redesign.css';
+ import './scene3d.css';
++import './items3d.css';
+ 
+ const container = document.getElementById('root');
+ createRoot(container).render(
+diff --git a/client/src/screens/Home.jsx b/client/src/screens/Home.jsx
+index e715399..41fa530 100644
+--- a/client/src/screens/Home.jsx
++++ b/client/src/screens/Home.jsx
+@@ -4,6 +4,7 @@ import { shareInvite } from '../share.js';
+ import { Sheet } from '../components/Sheet.jsx';
+ import { CardsArt, TableArt, GiftArt, CrystalArt, StarArt } from '../components/Art.jsx';
+ import { RefIcon, REF_ICONS } from '../components/RefIcon.jsx';
++import { Emoji3D, Deck3D } from '../components/Items3D.jsx';
+ 
+ const MODES = [
+   { id: 'podkidnoy', label: 'Подкидной' },
+@@ -398,7 +399,7 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
+         <button type="button" className="v2-tile v2-tile--mint" onClick={onInventory}>
+           <span className="v2-tile__glow" aria-hidden="true" />
+           <span className="v2-tile__art v3-icon" aria-hidden="true">
+-            <StarArt size={48} />
++            <Emoji3D id="emoji_diamond" size={46} />
+           </span>
+           <span className="v2-tile__title">Инвентарь</span>
+           <span className="v2-tile__sub">Колоды, столы, эмодзи</span>
+diff --git a/client/src/screens/Shop.jsx b/client/src/screens/Shop.jsx
+index c07830d..5f624e9 100644
+--- a/client/src/screens/Shop.jsx
++++ b/client/src/screens/Shop.jsx
+@@ -7,6 +7,7 @@ import { BankCardArt, BankCaseArt, bankOf } from '../components/BankCard.jsx';
+ import { BankCasePanel } from '../components/BankCase.jsx';
+ import { CaseRaritySections } from '../components/CaseRarity.jsx';
+ import { playCaseSpin, playCaseWin } from '../sfx.js';
++import { Reward3D } from '../components/Items3D.jsx';
+ import {
+   ChestArt,
+   DeckArt,
+@@ -95,8 +96,39 @@ export function Shop({ me, toast, refreshMe }) {
+   const [busyId, setBusyId] = useState(null);
+   const [opening, setOpening] = useState(null);
+   const [ratesBox, setRatesBox] = useState(null);
+-  const [offset, setOffset] = useState(0);
+   const viewportRef = useRef(null);
++  const trackRef = useRef(null);
++  // Каждое открытие получает свой номер: устаревшие таймеры и звук не мешают новому.
++  const runRef = useRef(0);
++  const busyRef = useRef(false);
++  const stopSoundRef = useRef(() => {});
++
++  // Полный сброс: звук, незавершённые таймеры (по номеру запуска) и состояние сцены.
++  function closeScene() {
++    runRef.current += 1;
++    busyRef.current = false;
++    stopSoundRef.current();
++    stopSoundRef.current = () => {};
++    setBusyId(null);
++    setOpening(null);
++  }
++
++  useEffect(() => {
++    if (!opening || opening.phase === 'charge') return undefined;
++    const onKey = (event) => {
++      if (event.key === 'Escape') closeScene();
++    };
++    window.addEventListener('keydown', onKey);
++    return () => window.removeEventListener('keydown', onKey);
++  }, [opening?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
++
++  useEffect(
++    () => () => {
++      runRef.current += 1;
++      stopSoundRef.current();
++    },
++    [],
++  );
+ 
+   useEffect(() => {
+     let alive = true;
+@@ -113,22 +145,29 @@ export function Shop({ me, toast, refreshMe }) {
+     };
+   }, [toast]);
+ 
+-  // Запуск движения рулетки: считаем смещение так, чтобы победная ячейка
+-  // оказалась точно по центру экрана.
++  // Запуск движения рулетки. Анимация создаётся заново для каждого открытия
++  // (Web Animations), поэтому прошлое положение ленты не может повлиять на новое.
+   useEffect(() => {
+     if (opening?.phase !== 'spin') return undefined;
++    const track = trackRef.current;
++    if (!track) return undefined;
+     const width = viewportRef.current?.clientWidth || 360;
+     const target = WIN_INDEX * STEP + CELL / 2 - width / 2;
+-    setOffset(0);
+-    let raf2 = 0;
+-    const raf1 = requestAnimationFrame(() => {
+-      raf2 = requestAnimationFrame(() => setOffset(target));
++    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
++    const from = 'translate3d(0, 0, 0)';
++    const to = `translate3d(${-target}px, 0, 0)`;
++    if (typeof track.animate !== 'function') {
++      track.style.transform = to;
++      return undefined;
++    }
++    track.style.transform = from;
++    const animation = track.animate([{ transform: from }, { transform: to }], {
++      duration: reduce ? 600 : SPIN_MS,
++      easing: 'cubic-bezier(0.08, 0.72, 0.05, 1)',
++      fill: 'forwards',
+     });
+-    return () => {
+-      cancelAnimationFrame(raf1);
+-      cancelAnimationFrame(raf2);
+-    };
+-  }, [opening?.phase]);
++    return () => animation.cancel();
++  }, [opening?.phase, opening?.runId]);
+ 
+   const items = catalog?.items || [];
+   const cases = catalog?.cases || [];
+@@ -175,17 +214,22 @@ export function Shop({ me, toast, refreshMe }) {
+   // Кейс: сундук заряжается, затем медленная рулетка и показ именно той
+   // награды, которую вернул сервер. Клиент не выбирает предмет.
+   async function openCase(box) {
+-    if (opening || busyId) return;
++    if (busyRef.current || opening || busyId) return;
++    busyRef.current = true;
++    runRef.current += 1;
++    const run = runRef.current;
++    const stale = () => runRef.current !== run;
++    stopSoundRef.current();
++    stopSoundRef.current = () => {};
+     setBusyId(box.id);
+-    setOpening({ box, phase: 'charge', strip: [], data: null, item: null });
+-    // Звук прокрутки живёт ровно столько, сколько анимация рулетки.
+-    let stopSpin = () => {};
++    setOpening({ box, phase: 'charge', strip: [], data: null, item: null, runId: run });
+ 
+     try {
+       const started = Date.now();
+       const requestId = `${box.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+       const data = await api('/shop/case', { method: 'POST', body: { caseId: box.id, requestId } });
+ 
++      // Сервер уже списал/выдал предмет: каталог обновляем в любом случае.
+       setCatalog((prev) =>
+         prev
+           ? {
+@@ -198,24 +242,35 @@ export function Shop({ me, toast, refreshMe }) {
+           : prev,
+       );
+       refreshMe?.();
++      if (stale()) return;
+ 
+       // Даём сундуку «зарядиться», даже если сервер ответил мгновенно.
+       await sleep(Math.max(0, 1100 - (Date.now() - started)));
++      if (stale()) return;
+ 
+       const strip = buildStrip(box, data.item?.id);
+-      setOpening({ box, phase: 'spin', strip, data, item: data.item || null });
++      setOpening({ box, phase: 'spin', strip, data, item: data.item || null, runId: run });
+ 
+-      stopSpin = playCaseSpin(SPIN_MS);
++      // Звук живёт ровно столько, сколько анимация; закрытие сцены глушит его.
++      stopSoundRef.current = playCaseSpin(SPIN_MS);
+       await sleep(SPIN_MS + 300);
+-      stopSpin();
++      if (stale()) return;
++      stopSoundRef.current();
++      stopSoundRef.current = () => {};
+       playCaseWin();
+-      setOpening((prev) => (prev ? { ...prev, phase: 'result' } : prev));
++      setOpening((prev) => (prev && prev.runId === run ? { ...prev, phase: 'result' } : prev));
+     } catch (error) {
+-      stopSpin();
+-      setOpening(null);
++      if (!stale()) {
++        stopSoundRef.current();
++        stopSoundRef.current = () => {};
++        setOpening(null);
++      }
+       toast(error.message, 'error');
+     } finally {
+-      setBusyId(null);
++      if (!stale()) {
++        busyRef.current = false;
++        setBusyId(null);
++      }
+     }
+   }
+ 
+@@ -426,6 +481,11 @@ export function Shop({ me, toast, refreshMe }) {
+           <span className="v3-scene__rays" aria-hidden="true" />
+           <span className="v3-scene__glow" aria-hidden="true" />
+ 
++          {opening.phase !== 'charge' ? (
++            <button type="button" className="v3-scene__close" aria-label="Закрыть" onClick={closeScene}>
++              ×
++            </button>
++          ) : null}
+           <div className="v3-scene__head">
+             <span className="v3-scene__title">{opening.box.name}</span>
+             <span className="v3-scene__state">
+@@ -458,8 +518,9 @@ export function Shop({ me, toast, refreshMe }) {
+             <div className="v3-roulette" ref={viewportRef}>
+               <span className="v3-roulette__marker" aria-hidden="true" />
+               <div
++                key={opening.runId}
++                ref={trackRef}
+                 className="v3-roulette__track"
+-                style={{ transform: `translate3d(${-offset}px, 0, 0)` }}
+               >
+                 {opening.strip.map((prize, index) => (
+                   <div
+@@ -488,9 +549,19 @@ export function Shop({ me, toast, refreshMe }) {
+                 ))}
+               </span>
+               <span className="v3-reward__ring" aria-hidden="true" />
+-              <span className={`v3-reward__art v3-reward--${winRarity}`}>
+-                {opening.data?.refund ? <CoinArt size={96} /> : itemArt(opening.item, 96)}
+-              </span>
++              {opening.data?.refund ? (
++                <span className={`v3-reward__art v3-reward--${winRarity}`}>
++                  <CoinArt size={96} />
++                </span>
++              ) : (
++                <Reward3D
++                  type={opening.item?.type || 'deck'}
++                  rarity={opening.item?.rarity || winRarity}
++                  name={opening.item?.name || ''}
++                >
++                  {itemArt(opening.item, opening.item?.type === 'table' ? 150 : 128)}
++                </Reward3D>
++              )}
+               {opening.data?.refund ? (
+                 <>
+                   <span className="v3-reward__name">Дубликат</span>
+@@ -500,14 +571,13 @@ export function Shop({ me, toast, refreshMe }) {
+                 </>
+               ) : (
+                 <>
+-                  <span className="v3-reward__name">{opening.item?.name || 'Предмет получен'}</span>
+                   <span className={`v3-reward__rarity v2-rarity v2-rarity--${winRarity}`}>
+                     {RARITY_LABEL[winRarity] || 'обычный'}
+                   </span>
+                   {opening.item?.desc ? <p className="v3-reward__hint">{opening.item.desc}</p> : null}
+                 </>
+               )}
+-              <button type="button" className="v2-btn v2-btn--primary" onClick={() => setOpening(null)}>
++              <button type="button" className="v2-btn v2-btn--primary" onClick={closeScene}>
+                 Забрать
+               </button>
+             </div>
+-- 
+2.43.0
+
