@@ -35,6 +35,19 @@ const RARITY_LABEL = {
 };
 
 const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+// Конфетти при получении награды: векторы считаем заранее, анимация — только transform/opacity.
+const BURST = Array.from({ length: 26 }, (_, index) => {
+  const angle = (index / 26) * Math.PI * 2 + (index % 2) * 0.12;
+  const dist = 90 + (index % 4) * 38;
+  return {
+    id: index,
+    dx: Math.round(Math.cos(angle) * dist),
+    dy: Math.round(Math.sin(angle) * dist * 0.8) - 20,
+    rot: (index * 67) % 360,
+    delay: (index % 5) * 30,
+    kind: index % 3,
+  };
+});
 
 // Рулетка кейса: фиксированный шаг ячейки, победитель всегда встаёт по центру.
 const CELL = 92;
@@ -409,7 +422,7 @@ export function Shop({ me, toast, refreshMe }) {
 
       <CaseScene open={Boolean(opening)} label={opening?.box?.name || 'Открытие кейса'}>
         {opening ? (
-        <div className="v3-scene">
+        <div className="v3-scene" data-phase={opening.phase} data-rarity={winRarity}>
           <span className="v3-scene__rays" aria-hidden="true" />
           <span className="v3-scene__glow" aria-hidden="true" />
 
@@ -421,6 +434,8 @@ export function Shop({ me, toast, refreshMe }) {
           </div>
 
           <div className="v3-scene__stage">
+            <span className="v3-scene__floor" aria-hidden="true" />
+            <span className="v3-scene__beam" aria-hidden="true" />
             <span
               className={`v3-scene__chest ${opening.phase === 'charge' ? 'is-charging' : ''} ${
                 isSpin || isResult ? 'is-open' : ''
@@ -450,6 +465,7 @@ export function Shop({ me, toast, refreshMe }) {
                   <div
                     key={`${prize?.id || 'cell'}-${index}`}
                     className={`v3-roulette__cell ${index === WIN_INDEX ? 'is-win' : ''}`}
+                    data-rarity={prize?.rarity || 'common'}
                     style={{ width: CELL, marginRight: GAP }}
                   >
                     <span className="v3-roulette__art" aria-hidden="true">{itemArt(prize, 52)}</span>
@@ -462,6 +478,16 @@ export function Shop({ me, toast, refreshMe }) {
 
           {isResult ? (
             <div className="v3-reward">
+              <span className="v3-burst" aria-hidden="true">
+                {BURST.map((piece) => (
+                  <i
+                    key={piece.id}
+                    className={`v3-burst__p v3-burst__p--${piece.kind}`}
+                    style={{ '--dx': `${piece.dx}px`, '--dy': `${piece.dy}px`, '--r': `${piece.rot}deg`, '--d': `${piece.delay}ms` }}
+                  />
+                ))}
+              </span>
+              <span className="v3-reward__ring" aria-hidden="true" />
               <span className={`v3-reward__art v3-reward--${winRarity}`}>
                 {opening.data?.refund ? <CoinArt size={96} /> : itemArt(opening.item, 96)}
               </span>

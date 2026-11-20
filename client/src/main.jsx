@@ -10,6 +10,7 @@ import './v3.css';
 import './casino.css';
 import './layout.css';
 import './redesign.css';
+import './scene3d.css';
 
 const container = document.getElementById('root');
 createRoot(container).render(

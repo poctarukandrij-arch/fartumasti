@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { RefIcon } from './RefIcon.jsx';
 
 const TONES = {
   gold: ['#fff3a6', '#ffc300', '#b9770e', '#e53a55'],
@@ -47,27 +48,7 @@ export function Crown({ size = 48, tone = 'gold', className = '' }) {
 
 export default Crown;
 
-// Золотая монета со звездой — валюта в шапке и на карточках.
+// Золотая монета — валюта в шапке и на карточках (иллюстрация из референса).
 export function GoldCoin({ size = 24 }) {
-  const uid = `gc${useId().replace(/[:]/g, '')}`;
-  return (
-    <svg className="gold-coin" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id={uid} x1="6" y1="3" x2="26" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fff0a0" />
-          <stop offset="0.5" stopColor="#ffc400" />
-          <stop offset="1" stopColor="#c97a06" />
-        </linearGradient>
-      </defs>
-      <circle cx="16" cy="16" r="14.5" fill={`url(#${uid})`} stroke="#8a4b05" strokeWidth="1.4" />
-      <circle cx="16" cy="16" r="10.6" fill="none" stroke="#fff6c0" strokeOpacity="0.85" strokeWidth="1.2" />
-      <path
-        d="M16 8.2l2.2 4.6 5 .6-3.700 3.500.9 5-4.400-2.500-4.400 2.500.9-5-3.700-3.500 5-.6z"
-        fill="#fff6c0"
-        stroke="#b8700a"
-        strokeWidth="0.9"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <RefIcon name="coin" height={size} className="gold-coin" />;
 }

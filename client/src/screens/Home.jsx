@@ -2,10 +2,8 @@ import { useMemo, useState } from 'react';
 import { rub } from '../utils.js';
 import { shareInvite } from '../share.js';
 import { Sheet } from '../components/Sheet.jsx';
-import { CardsArt, TableArt, GiftArt, CrystalArt, StarArt, TrophyArt, ShopArt, WalletArt } from '../components/Art.jsx';
-import { Mascot } from '../components/Avatar.jsx';
-import { Crown } from '../components/Crown.jsx';
-import { Logo } from '../components/Logo.jsx';
+import { CardsArt, TableArt, GiftArt, CrystalArt, StarArt } from '../components/Art.jsx';
+import { RefIcon, REF_ICONS } from '../components/RefIcon.jsx';
 
 const MODES = [
   { id: 'podkidnoy', label: 'Подкидной' },
@@ -21,10 +19,10 @@ const MIN_BUYN = 200;
 // Уровни комнат — быстрые пресеты входного взноса для создания стола.
 // Правила и лимиты те же, что в форме «Новый стол» (минимум 200 ₽, 2–4 игрока).
 const TIERS = [
-  { id: 'novice', name: 'Новичок', tone: 'green', crown: 'green', buyin: 200 },
-  { id: 'amateur', name: 'Любитель', tone: 'blue', crown: 'silver', buyin: 500 },
-  { id: 'pro', name: 'Профи', tone: 'purple', crown: 'purple', buyin: 1000 },
-  { id: 'elite', name: 'Элита', tone: 'gold', crown: 'red', buyin: 5000 },
+  { id: 'novice', name: 'Новичок', tone: 'green', crownImg: 'crownGreen', buyin: 200 },
+  { id: 'amateur', name: 'Любитель', tone: 'blue', crownImg: 'crownBlue', buyin: 500 },
+  { id: 'pro', name: 'Профи', tone: 'purple', crownImg: 'crownPurple', buyin: 1000 },
+  { id: 'elite', name: 'Элита', tone: 'gold', crownImg: 'crownGold', buyin: 5000 },
 ];
 const MAX_BUYN = 500000;
 
@@ -297,7 +295,7 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
             <article key={tier.id} className={`rd-tier rd-tier--${tier.tone}`}>
               <span className="rd-tier__name">{tier.name}</span>
               <span className="rd-tier__crown">
-                <Crown size={70} tone={tier.crown} />
+                <RefIcon name={tier.crownImg} height={74} />
               </span>
               <span className="rd-tier__price">от {tier.buyin.toLocaleString('ru-RU')} ₽</span>
               <span className="rd-tier__players">Игроков: 2–4</span>
@@ -326,37 +324,38 @@ export function Home({ me, lobby, send, toast, inQueue, onRules, onInventory, on
   return (
     <div className="v2 v3-home rd-home">
       <section className="rd-hero">
-        <span className="rd-hero__glow" aria-hidden="true" />
-        <span className="rd-hero__deco rd-hero__deco--a" aria-hidden="true">♠</span>
-        <span className="rd-hero__deco rd-hero__deco--b" aria-hidden="true">♥</span>
-        <span className="rd-hero__deco rd-hero__deco--c" aria-hidden="true">♣</span>
-        <div className="rd-hero__text">
-          <Logo size="lg" />
-          <span className="rd-ribbon">Играй вместе с друзьями!</span>
-          <span className="v2-live rd-live">
-            <span className="v2-live__dot" aria-hidden="true" />
-            {online} онлайн
-          </span>
-        </div>
-        <Mascot name={username || 'Игрок'} className="rd-hero__mascot" />
+        <img
+          className="rd-hero__img"
+          src={REF_ICONS.hero}
+          width="756"
+          height="282"
+          alt="FARTU MASTI — играй вместе с друзьями!"
+          decoding="async"
+          fetchpriority="high"
+          draggable="false"
+        />
+        <span className="v2-live rd-live">
+          <span className="v2-live__dot" aria-hidden="true" />
+          {online} онлайн
+        </span>
       </section>
 
       <div className="rd-trio">
         <button type="button" className="rd-trio__tile rd-trio__tile--violet" onClick={() => setView('rooms')}>
           <span className="rd-trio__art" aria-hidden="true">
-            <TrophyArt size={46} />
+            <RefIcon name="trophy" height={50} />
           </span>
           <span className="rd-trio__label">Игровые комнаты</span>
         </button>
         <button type="button" className="rd-trio__tile rd-trio__tile--gold" onClick={() => onTab?.('shop')}>
           <span className="rd-trio__art" aria-hidden="true">
-            <ShopArt size={46} />
+            <RefIcon name="cart" height={52} />
           </span>
           <span className="rd-trio__label">Магазин</span>
         </button>
         <button type="button" className="rd-trio__tile rd-trio__tile--blue" onClick={onBalance}>
           <span className="rd-trio__art" aria-hidden="true">
-            <WalletArt size={46} />
+            <RefIcon name="wallet" height={48} />
           </span>
           <span className="rd-trio__label">Кошелёк</span>
         </button>

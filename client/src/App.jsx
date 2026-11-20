@@ -17,6 +17,7 @@ import Inventory from './screens/Inventory.jsx';
 import Rules from './screens/Rules.jsx';
 import Support from './screens/Support.jsx';
 import TableScreen from './screens/Table.jsx';
+import { RefIcon } from './components/RefIcon.jsx';
 
 const TABS = [
   { id: 'home', label: 'Главная', icon: 'home' },
@@ -42,7 +43,10 @@ const NAV_PATHS = {
   ),
 };
 
+const NAV_IMAGES = { home: 'navHome', shop: 'cart', stats: 'navRating', profile: 'navProfile' };
+
 function NavIcon({ name }) {
+  if (NAV_IMAGES[name]) return <RefIcon name={NAV_IMAGES[name]} height={30} className="nav__img" />;
   return (
     <svg
       className="nav__icon"

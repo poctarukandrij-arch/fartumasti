@@ -4,7 +4,7 @@ import { rub } from '../utils.js';
 import { PlayerTag } from '../components/PlayerTag.jsx';
 import { shareInvite } from '../share.js';
 import { Avatar } from '../components/Avatar.jsx';
-import { Crown } from '../components/Crown.jsx';
+import { RefIcon } from '../components/RefIcon.jsx';
 
 const num = (value) => Number(value) || 0;
 
@@ -91,7 +91,7 @@ export function Profile({ me, stats, onLogout, onWithdraw, onInventory, refreshM
     <div className="screen v2">
       <section className="rd-profile">
         <div className="rd-profile__ava">
-          <Crown size={64} className="rd-profile__crown" />
+          <RefIcon name="crownGold" height={56} className="rd-profile__crown" />
           <Avatar name={me?.username || '?'} size={112} ring="gold" />
         </div>
         <div className="rd-profile__info">
