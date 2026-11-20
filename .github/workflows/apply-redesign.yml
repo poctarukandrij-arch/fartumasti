@@ -24,7 +24,7 @@ jobs:
 
       - name: Apply redesign patch
         run: |
-          git am --3way --keep-cr redesign-fartu-masti.patch
+    git am --3way --keep-cr appjet-update-2.patch
 
       - name: Push redesign
         run: |
